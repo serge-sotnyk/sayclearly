@@ -141,9 +141,7 @@ Local launch via `uvx` was chosen because it:
 1. The user runs `uvx sayclearly`
 2. The browser opens with the local application
 3. The application prompts for a Gemini API key
-4. The user selects a key storage mode:
-   - current session only;
-   - remember on this computer
+4. The key is stored locally on this computer for future launches
 5. The user sets:
    - text language;
    - optionally a topic
@@ -314,7 +312,7 @@ Example of an unsuitable style:
 Contains:
 
 - API key input;
-- key storage mode;
+- settings button;
 - text language;
 - analysis language;
 - flag: use the same language for analysis;
@@ -363,6 +361,13 @@ Contains a list of recent sessions:
 - short analysis summary.
 
 The user can open details of a past session.
+
+### 6. Settings screen
+
+Contains:
+
+- saved API key status;
+- clear saved API key button.
 
 ---
 
@@ -438,16 +443,15 @@ Example:
   "same_language_for_analysis": true,
   "last_topic_prompt": "interesting facts about science",
   "session_limit": 300,
-  "remember_api_key": false,
   "keep_last_audio": false
 }
 ```
 
 ### Notes
 
-- `remember_api_key = false` by default
 - `same_language_for_analysis = true` by default
-- if the user chooses to store the key across launches, the key may be stored locally in a separate field or separate file
+- if a local API key is present, it may be stored in a separate field or separate file
+- the settings screen must allow clearing the stored key
 - this is a local application for one user, so complex storage is not required
 
 ## 11.2 history.json
@@ -529,6 +533,10 @@ Returns the current configuration.
 ### `POST /api/config`
 
 Saves the updated configuration.
+
+### `DELETE /api/config/api-key`
+
+Deletes the locally stored Gemini API key.
 
 ### `POST /api/generate-text`
 
@@ -671,19 +679,10 @@ If automatic instrumentation turns out to be insufficient or unstable, manual sp
 - the application does not send the key to the developer's server;
 - the key is used only by the local backend.
 
-## Modes
+## MVP behavior
 
-### Session mode
-
-The key is stored only in process memory and disappears after shutdown.
-
-### Remember mode
-
-The key is stored locally on this machine.
-
-### Default
-
-The default is **session mode**.
+- the key is stored locally on this machine for future launches;
+- the settings screen must allow clearing the stored key at any time.
 
 ---
 

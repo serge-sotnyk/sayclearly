@@ -18,19 +18,19 @@ How to verify:
 
 ## Stage 2. Local Data and Storage Foundation
 
-Add the local data layer under `~/.sayclearly/`: configuration loading/saving, history loading/saving, cache directory management, defaults, versioned JSON structures, atomic writes, and the distinction between session-only and remembered API key storage.
+Add the local data layer under `~/.sayclearly/`: configuration loading/saving, history loading/saving, cache directory management, defaults, versioned JSON structures, atomic writes, local API key storage, and clearing locally stored keys.
 
 At the end of this stage, the app should have a reliable local persistence foundation without depending on Gemini or the full UI flow.
 
 How to verify:
 
 - The application creates the expected local folder structure on first run.
-- Config changes persist across restarts when persistence is enabled.
+- Config changes persist across restarts, and a locally stored API key can be cleared cleanly.
 - History storage enforces the session limit and writes files atomically.
 
 ## Stage 3. Guided Exercise Flow UI
 
-Build the core product flow in the browser with server-rendered HTML and plain TypeScript: home/setup screen, language controls, topic input, "use same language" behavior, generated exercise display, and the three guided exercise steps driven by a simple state machine.
+Build the core product flow in the browser with server-rendered HTML and plain TypeScript: home/setup screen with API key entry and settings access, language controls, topic input, "use same language" behavior, generated exercise display, and the three guided exercise steps driven by a simple state machine.
 
 Use a temporary stub for generated exercise text so the flow can be exercised before AI integration.
 
@@ -38,7 +38,7 @@ At the end of this stage, a user should be able to move through the main non-rec
 
 How to verify:
 
-- The setup screen captures the required inputs.
+- The setup screen captures the required inputs, and settings expose stored API key management and language settings.
 - The UI transitions through the expected exercise states in the right order.
 - A user can generate a placeholder exercise and reach the retelling step without manual page editing or developer tools.
 
@@ -70,14 +70,14 @@ How to verify:
 
 ## Stage 6. Audio Analysis with Gemini
 
-Replace the stub analysis with real Gemini-backed audio analysis. Add upload-to-model integration, structured JSON normalization, feedback shaping, and optional Langfuse instrumentation when the required environment variables are present.
+Replace the stub analysis with real Gemini-backed audio analysis. Add upload-to-model integration, structured JSON normalization, feedback shaping in the selected analysis language, and optional Langfuse instrumentation for model-backed calls when the required environment variables are present.
 
 At the end of this stage, the app should return compact, practical feedback from a real recorded retelling.
 
 How to verify:
 
 - A recorded retelling can be sent from the UI and analyzed successfully.
-- The review payload contains normalized fields for clarity, pace, hesitations, summary, and recommendations.
+- The review payload contains normalized fields for clarity, pace, hesitations, summary, and recommendations, and respects the chosen analysis language.
 - Friendly error handling works for missing key, invalid key, and Gemini-side failures.
 
 ## Stage 7. Review and History Experience
