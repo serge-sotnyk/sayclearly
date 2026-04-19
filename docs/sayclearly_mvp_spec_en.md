@@ -26,7 +26,7 @@ Create a very simple personal tool that reduces friction before speaking practic
 - a meeting;
 - an interview;
 - a call;
-- any short conversation in Russian / Ukrainian / English / another language.
+- any short conversation in Ukrainian / English / another language.
 
 ### Product value
 
@@ -234,7 +234,6 @@ In practice, the UI should provide:
 - quick buttons for popular languages, for example:
   - English
   - Ukrainian
-  - Russian
 - a button or flag such as **Use same language for analysis**.
 
 There is no need to strictly limit the list of languages.
