@@ -213,3 +213,6 @@ CLAUDE.local.md
 
 # Local uv cache created when sandboxed tooling cannot access the user cache
 .uv-cache/
+
+# Local git worktrees
+.worktrees/
