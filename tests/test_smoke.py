@@ -28,3 +28,11 @@ def test_home_page_renders_local_shell() -> None:
     assert "text/html" in response.headers["content-type"]
     assert "SayClearly" in response.text
     assert "/static/styles.css" in response.text
+
+
+def test_docs_endpoint_is_not_exposed() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/docs")
+
+    assert response.status_code == 404
