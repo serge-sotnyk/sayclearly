@@ -55,6 +55,15 @@ CLAUDE.md                        # Points Claude-compatible tools to AGENTS.md
 - Keep application logic separated from storage, Gemini integration, and HTTP handlers
 - Add tests with `pytest` for storage, state transitions, and response normalization as code appears
 
+## Testing Guidelines
+
+- Prefer focused, high-value tests over chasing coverage for its own sake
+- Cover each meaningful behavior with a clear happy path
+- Add obvious edge and error cases where behavior is easy to get wrong or important to preserve
+- Prefer parametrized tests when they reduce repetition without hiding intent
+- Add narrower regression tests when real bugs appear instead of preemptively testing every branch
+- Avoid noisy or fragile tests that make routine maintenance harder than the behavior is worth
+
 ## Configuration
 
 - Store local runtime data under `~/.sayclearly/`
