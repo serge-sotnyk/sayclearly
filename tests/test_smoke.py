@@ -1,8 +1,19 @@
-from sayclearly.main import main
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from sayclearly.app import create_app
 
 
-def test_main_prints_placeholder_message(capsys) -> None:
-    main()
+def test_create_app_returns_fastapi_instance() -> None:
+    app = create_app()
 
-    captured = capsys.readouterr()
-    assert "SayClearly is initialized." in captured.out
+    assert isinstance(app, FastAPI)
+
+
+def test_health_endpoint_returns_ok() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
