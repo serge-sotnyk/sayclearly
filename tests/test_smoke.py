@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import sayclearly.main as main_module
 from sayclearly.app import create_app
 
 
@@ -20,13 +21,22 @@ def test_health_endpoint_returns_ok() -> None:
 
 
 def test_home_page_renders_local_shell() -> None:
-    client = TestClient(create_app(), root_path="/sayclearly")
+    client = TestClient(create_app())
 
     response = client.get("/")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "SayClearly" in response.text
+    assert "/static/styles.css" in response.text
+
+
+def test_home_page_uses_root_path_for_static_assets() -> None:
+    client = TestClient(create_app(), root_path="/sayclearly")
+
+    response = client.get("/")
+
+    assert response.status_code == 200
     assert "/sayclearly/static/styles.css" in response.text
 
 
@@ -62,3 +72,44 @@ def test_openapi_endpoint_is_not_exposed() -> None:
     response = client.get("/openapi.json")
 
     assert response.status_code == 404
+
+
+def test_main_opens_browser_and_starts_server(monkeypatch) -> None:
+    opened_urls: list[str] = []
+    run_calls: list[tuple[object, str, int]] = []
+
+    def fake_open(url: str) -> bool:
+        opened_urls.append(url)
+        return True
+
+    def fake_run(app: object, host: str, port: int) -> None:
+        run_calls.append((app, host, port))
+
+    monkeypatch.setattr(main_module.webbrowser, "open", fake_open)
+    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
+
+    main_module.main()
+
+    assert opened_urls == [f"http://{main_module.HOST}:{main_module.PORT}/"]
+    assert len(run_calls) == 1
+    app, host, port = run_calls[0]
+    assert isinstance(app, FastAPI)
+    assert host == main_module.HOST
+    assert port == main_module.PORT
+
+
+def test_main_starts_server_when_browser_open_fails(monkeypatch) -> None:
+    run_calls: list[tuple[object, str, int]] = []
+
+    def fake_open(url: str) -> bool:
+        raise RuntimeError("browser unavailable")
+
+    def fake_run(app: object, host: str, port: int) -> None:
+        run_calls.append((app, host, port))
+
+    monkeypatch.setattr(main_module.webbrowser, "open", fake_open)
+    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
+
+    main_module.main()
+
+    assert len(run_calls) == 1
