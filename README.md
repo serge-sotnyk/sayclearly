@@ -16,6 +16,8 @@ uv sync
 uv run sayclearly
 ```
 
+Running `uv run sayclearly` starts the local FastAPI server on `127.0.0.1:8008`, opens the app in your browser, and exposes a simple health endpoint at `/api/health`.
+
 ### Development
 
 ```bash
