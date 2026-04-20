@@ -1,0 +1,58 @@
+:root {
+    color-scheme: light;
+    font-family: Inter, "Segoe UI", sans-serif;
+    background: #f7f4ef;
+    color: #1f2933;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background:
+        radial-gradient(circle at top, #fff9ef, #f7f4ef 50%),
+        #f7f4ef;
+}
+
+.page-shell {
+    width: min(42rem, calc(100% - 2rem));
+    padding: 3rem;
+    border-radius: 1.5rem;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 1.5rem 4rem rgba(15, 23, 42, 0.08);
+}
+
+.eyebrow {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8a6d3b;
+}
+
+h1 {
+    margin: 0;
+    font-size: clamp(2.5rem, 6vw, 3.5rem);
+}
+
+.lead,
+.hint {
+    max-width: 36rem;
+    line-height: 1.6;
+}
+
+.lead {
+    margin: 1rem 0 0;
+    font-size: 1.1rem;
+}
+
+.hint {
+    margin: 1rem 0 0;
+    color: #52606d;
+}
