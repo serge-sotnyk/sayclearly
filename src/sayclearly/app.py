@@ -13,9 +13,6 @@ def create_app() -> FastAPI:
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     app = FastAPI(
         title="SayClearly",
-        docs_url=None,
-        redoc_url=None,
-        openapi_url=None,
     )
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
