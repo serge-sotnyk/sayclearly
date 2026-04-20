@@ -17,3 +17,11 @@ def test_health_endpoint_returns_ok() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_docs_endpoint_is_not_exposed() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/docs")
+
+    assert response.status_code == 404
