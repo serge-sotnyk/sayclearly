@@ -12,14 +12,15 @@ PORT = 8008
 
 
 def main() -> None:
+    app = create_app()
     url = f"http://{HOST}:{PORT}/"
 
-    try:
-        webbrowser.open(url)
-    except Exception:
-        logging.getLogger(__name__).warning(
-            "Could not open browser automatically.",
-            exc_info=True,
-        )
+    def open_browser() -> None:
+        try:
+            webbrowser.open(url)
+        except Exception:
+            logging.getLogger(__name__).info("Could not open browser automatically.")
 
-    uvicorn.run(create_app(), host=HOST, port=PORT)
+    app.router.add_event_handler("startup", open_browser)
+
+    uvicorn.run(app, host=HOST, port=PORT)

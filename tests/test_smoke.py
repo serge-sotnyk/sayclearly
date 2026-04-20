@@ -83,7 +83,10 @@ def test_main_opens_browser_and_starts_server(monkeypatch) -> None:
         return True
 
     def fake_run(app: object, host: str, port: int) -> None:
+        assert opened_urls == []
         run_calls.append((app, host, port))
+        for startup_handler in app.router.on_startup:
+            startup_handler()
 
     monkeypatch.setattr(main_module.webbrowser, "open", fake_open)
     monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
@@ -98,14 +101,17 @@ def test_main_opens_browser_and_starts_server(monkeypatch) -> None:
     assert port == main_module.PORT
 
 
-def test_main_starts_server_when_browser_open_fails(monkeypatch) -> None:
+def test_main_starts_server_when_browser_open_fails(monkeypatch, caplog) -> None:
     run_calls: list[tuple[object, str, int]] = []
+    caplog.set_level("INFO")
 
     def fake_open(url: str) -> bool:
         raise RuntimeError("browser unavailable")
 
     def fake_run(app: object, host: str, port: int) -> None:
         run_calls.append((app, host, port))
+        for startup_handler in app.router.on_startup:
+            startup_handler()
 
     monkeypatch.setattr(main_module.webbrowser, "open", fake_open)
     monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
@@ -113,3 +119,24 @@ def test_main_starts_server_when_browser_open_fails(monkeypatch) -> None:
     main_module.main()
 
     assert len(run_calls) == 1
+    assert caplog.messages == ["Could not open browser automatically."]
+
+
+def test_main_registers_browser_open_on_app_startup(monkeypatch) -> None:
+    opened_urls: list[str] = []
+    startup_handler_counts: list[int] = []
+
+    def fake_open(url: str) -> bool:
+        opened_urls.append(url)
+        return True
+
+    def fake_run(app: object, host: str, port: int) -> None:
+        startup_handler_counts.append(len(app.router.on_startup))
+
+    monkeypatch.setattr(main_module.webbrowser, "open", fake_open)
+    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
+
+    main_module.main()
+
+    assert opened_urls == []
+    assert startup_handler_counts == [1]
