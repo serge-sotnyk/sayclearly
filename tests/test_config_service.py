@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-import sayclearly.config_service as config_service_module
-from sayclearly.config_models import ConfigUpdatePayload
-from sayclearly.config_service import ConfigService
+import sayclearly.config.service as config_service_module
+from sayclearly.config.models import ConfigUpdatePayload
+from sayclearly.config.service import ConfigService
 
 
 def make_payload(**overrides: object) -> ConfigUpdatePayload:

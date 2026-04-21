@@ -2,9 +2,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from sayclearly.history_service import HistoryService, HistorySessionNotFoundError
-from sayclearly.storage import StorageError
-from sayclearly.storage_models import HistorySession, HistoryStore
+from sayclearly.history.service import HistoryService, HistorySessionNotFoundError
+from sayclearly.storage.files import StorageError
+from sayclearly.storage.models import HistorySession, HistoryStore
 
 
 def build_history_router(data_root: Path | None = None) -> APIRouter:

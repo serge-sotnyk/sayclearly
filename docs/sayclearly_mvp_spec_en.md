@@ -138,7 +138,7 @@ Local launch via `uvx` was chosen because it:
 
 ## First launch
 
-1. The user runs `uvx sayclearly`
+1. The user runs `uvx --from git+https://github.com/serge-sotnyk/sayclearly sayclearly`
 2. The browser opens with the local application
 3. The application prompts for a Gemini API key
 4. The key is stored locally on this computer for future launches
@@ -740,12 +740,16 @@ sayclearly/
   pyproject.toml
   src/sayclearly/
     __init__.py
-    main.py
     app.py
-    config.py
-    storage.py
-    gemini.py
-    models.py
+    main.py
+    config/
+      __init__.py
+    history/
+      __init__.py
+    storage/
+      __init__.py
+    web/
+      __init__.py
     templates/
       index.html
     static/
@@ -756,10 +760,60 @@ sayclearly/
 
 ### Packaging requirements
 
-- launch via `uvx sayclearly`
+- launch via `uvx --from git+https://github.com/serge-sotnyk/sayclearly sayclearly`
 - entry point via `[project.scripts]`
 - backend starts on a fixed localhost port
 - browser opens automatically
+
+## 18.x Implementation-time decisions
+
+The codebase should grow using a domain-oriented package structure rather than a global layer-based layout.
+
+Recommended package shape:
+
+```text
+src/sayclearly/
+  __init__.py
+  app.py
+  main.py
+  web/
+    __init__.py
+    errors.py
+  config/
+    __init__.py
+    api.py
+    models.py
+    service.py
+  history/
+    __init__.py
+    api.py
+    service.py
+  storage/
+    __init__.py
+    files.py
+    models.py
+```
+
+As later stages are implemented, new product areas should be added as their own domain packages, for example:
+
+- `exercise/`
+- `recording/`
+- `analysis/`
+
+### Responsibilities
+
+- `app.py` assembles the FastAPI application and wires routers, shared handlers, and static assets.
+- `main.py` contains CLI startup only.
+- `web/` contains thin shared web concerns such as exception handlers.
+- Each domain package can own its own `api.py`, `models.py`, and `service.py` when that boundary is useful.
+- `storage/` contains low-level persistence code and persisted storage models shared across domains.
+- Domain packages should not import each other's `api.py` modules.
+
+### `__init__.py` style
+
+By default, `__init__.py` files should stay empty.
+
+Avoid routine package re-export boilerplate such as duplicated imports plus `__all__` declarations unless a package is intentionally exposing a small external interface. If package-level initialization is needed, prefer an explicit dedicated module instead of hidden import-time behavior.
 
 ---
 
@@ -815,17 +869,16 @@ For the first version, we fix the following:
 
 ## 22. Immediate next implementation step
 
-The next step after this specification:
+The next step after the package/layout groundwork:
 
-**create technical implementation plan v1** broken down into stages:
+**continue implementation in staged vertical slices** such as:
 
-1. package skeleton;
-2. local launcher;
-3. config/history storage;
-4. HTML screens;
-5. TypeScript state machine;
-6. recording flow;
-7. Gemini text generation;
-8. Gemini audio analysis;
-9. save/review/history;
-10. packaging and smoke test.
+1. local launcher and app wiring;
+2. config/history storage;
+3. HTML screens;
+4. TypeScript state machine;
+5. recording flow;
+6. Gemini text generation;
+7. Gemini audio analysis;
+8. save/review/history;
+9. packaging and smoke test.

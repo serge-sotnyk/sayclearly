@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from sayclearly.history_service import HistoryService, HistorySessionNotFoundError
-from sayclearly.storage import load_config, load_history, save_config
-from sayclearly.storage_models import HistorySession, SessionAnalysis
+from sayclearly.history.service import HistoryService, HistorySessionNotFoundError
+from sayclearly.storage.files import load_config, load_history, save_config
+from sayclearly.storage.models import HistorySession, SessionAnalysis
 
 
 def make_session(session_id: str) -> HistorySession:
@@ -84,7 +84,7 @@ def test_save_session_serializes_concurrent_writes_in_process(
     first_save_started = threading.Event()
     save_call_count = 0
 
-    from sayclearly.storage import save_history as original_save_history
+    from sayclearly.storage.files import save_history as original_save_history
 
     def delayed_save_history(data_root: Path | None, history: object) -> None:
         nonlocal save_call_count
@@ -95,7 +95,7 @@ def test_save_session_serializes_concurrent_writes_in_process(
         original_save_history(data_root, history)
 
     monkeypatch.setattr(
-        "sayclearly.history_service.save_history",
+        "sayclearly.history.service.save_history",
         delayed_save_history,
     )
 

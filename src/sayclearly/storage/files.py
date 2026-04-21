@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from sayclearly.storage_models import HistoryStore, StoredConfig, StoredSecrets
+from sayclearly.storage.models import HistoryStore, StoredConfig, StoredSecrets
 
 APP_DIR_NAME = ".sayclearly"
 CONFIG_FILE_NAME = "config.json"

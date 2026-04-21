@@ -1,8 +1,8 @@
 from pathlib import Path
 from threading import Lock
 
-from sayclearly.storage import load_config, load_history, save_history
-from sayclearly.storage_models import HistorySession, HistoryStore
+from sayclearly.storage.files import load_config, load_history, save_history
+from sayclearly.storage.models import HistorySession, HistoryStore
 
 _SAVE_SESSION_LOCK = Lock()
 

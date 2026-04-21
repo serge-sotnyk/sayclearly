@@ -34,11 +34,23 @@ docs/
 └── sayclearly_mvp_spec_en.md    # Product and MVP specification
 src/
 └── sayclearly/
-    ├── __init__.py              # Package metadata
-    └── main.py                  # CLI entry point placeholder
+    ├── __init__.py               # Package marker for the application package
+    ├── app.py                   # FastAPI app factory and composition root
+    ├── main.py                  # CLI entry point for local startup
+    ├── config/                  # Configuration models, API, and service
+    │   └── __init__.py           # Empty package marker
+    ├── history/                 # Session history API and service
+    │   └── __init__.py           # Empty package marker
+    ├── storage/                 # Filesystem persistence models and helpers
+    │   └── __init__.py           # Empty package marker
+    ├── web/                     # Web-layer helpers such as error handling
+    │   └── __init__.py           # Empty package marker
+    ├── templates/               # Jinja2 templates
+    └── static/                  # Frontend assets
 tests/
 ├── __init__.py                  # Test package marker
-└── test_smoke.py                # Basic project smoke test
+├── test_smoke.py                # Basic project smoke test
+└── test_*.py                    # Focused tests for package modules
 pyproject.toml                   # Project metadata and tool configuration
 README.md                        # Project overview and local setup
 AGENTS.md                        # Shared repository instructions for AI agents
@@ -51,6 +63,9 @@ CLAUDE.md                        # Points Claude-compatible tools to AGENTS.md
 - Target Python 3.13+
 - Use `uv` for dependency management and project commands
 - Use `ruff` for linting and formatting; keep configuration in `pyproject.toml`
+- Prefer a domain-oriented package structure for new code (`config/`, `history/`, `exercise/`, `recording/`, `analysis/`) instead of a project-wide `api/`, `services/`, `models/` split; add per-domain `api.py`, `models.py`, and `service.py` only where that boundary is useful, while shared persisted boundary models may remain under `storage/`
+- Keep `__init__.py` files empty by default
+- Avoid routine re-export boilerplate and duplicated `__all__` declarations in `__init__.py`
 - Prefer typed Python code, small modules, and explicit data models for API and storage boundaries
 - Keep application logic separated from storage, Gemini integration, and HTTP handlers
 - Add tests with `pytest` for storage, state transitions, and response normalization as code appears
@@ -73,6 +88,6 @@ CLAUDE.md                        # Points Claude-compatible tools to AGENTS.md
 
 ## Development Notes
 
-- This repository starts as infrastructure only; application code is added in later implementation steps
-- Use the `ctx7` CLI for current library/framework documentation when working with external dependencies
+- The repository already includes the local app entry point and initial domain packages; keep new work aligned with the documented package layout above
+- Use the configured Context7 documentation workflow for current library/framework references; do not rely on undeclared local helper CLIs
 - Keep the MVP local-only: no remote backend, no shared key storage, no long-term audio retention by default

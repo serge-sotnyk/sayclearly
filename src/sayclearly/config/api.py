@@ -2,9 +2,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from sayclearly.config_models import ConfigUpdatePayload, PublicConfigView
-from sayclearly.config_service import ConfigService
-from sayclearly.storage import StorageError
+from sayclearly.config.models import ConfigUpdatePayload, PublicConfigView
+from sayclearly.config.service import ConfigService
+from sayclearly.storage.files import StorageError
 
 
 def build_config_router(data_root: Path | None = None) -> APIRouter:

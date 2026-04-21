@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from sayclearly.storage import (
+from sayclearly.storage.files import (
     StorageError,
     load_config,
     load_history,
@@ -12,7 +12,7 @@ from sayclearly.storage import (
     save_history,
     save_secrets,
 )
-from sayclearly.storage_models import HistoryStore, StoredSecrets
+from sayclearly.storage.models import HistoryStore, StoredSecrets
 
 
 def test_load_config_creates_default_storage_tree(tmp_path: Path) -> None:
