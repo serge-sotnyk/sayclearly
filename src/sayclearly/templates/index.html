@@ -77,6 +77,27 @@
             Your generated exercise text will appear here when the frontend bundle is connected.
           </div>
 
+          <div class="recording-panel" data-recording-controls>
+            <p class="recording-status" data-recording-status>Recording controls will appear here when the frontend bundle is connected.</p>
+
+            <div class="button-row">
+              <button type="button" class="button button-primary" hidden data-start-recording-button>Start recording</button>
+              <button type="button" class="button button-secondary" hidden data-stop-recording-button>Stop recording</button>
+              <button type="button" class="button button-primary" hidden data-analyze-recording-button>Analyze recording</button>
+              <button type="button" class="button button-secondary" hidden data-record-again-button>Record again</button>
+            </div>
+
+            <audio controls hidden data-recording-preview></audio>
+          </div>
+
+          <div class="review-panel" hidden data-review-panel aria-live="polite">
+            <p class="review-copy" data-review-summary>Review summary will appear here after analysis.</p>
+            <p class="review-copy" data-review-clarity></p>
+            <p class="review-copy" data-review-pace></p>
+            <p class="review-copy" data-review-hesitations></p>
+            <p class="review-copy" data-review-recommendations></p>
+          </div>
+
           <div class="button-row">
             <button type="button" class="button button-secondary" data-reset-button>Reset</button>
             <button type="button" class="button button-primary" data-next-step-button>Next step</button>

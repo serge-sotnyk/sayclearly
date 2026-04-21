@@ -36,6 +36,9 @@ export function createInitialAppModel() {
         config: DEFAULT_CONFIG,
         settings: buildSettingsFromConfig(DEFAULT_CONFIG),
         generated_exercise: null,
+        has_recording: false,
+        recording_error: null,
+        review: null,
         error_message: null,
     };
 }
@@ -102,6 +105,9 @@ export function applyGeneratedExercise(model, exercise) {
         ...model,
         flow: 'step_1_slow',
         generated_exercise: exercise,
+        has_recording: false,
+        recording_error: null,
+        review: null,
         error_message: null,
     };
 }
@@ -121,4 +127,72 @@ export function advanceExerciseStep(model) {
         default:
             return model;
     }
+}
+export function startRecordingRequest(model) {
+    return {
+        ...model,
+        flow: 'requesting_microphone',
+        has_recording: false,
+        recording_error: null,
+        review: null,
+    };
+}
+export function markRecordingStarted(model) {
+    return {
+        ...model,
+        flow: 'recording',
+        recording_error: null,
+    };
+}
+export function storeRecordedAudio(model) {
+    return {
+        ...model,
+        flow: 'recorded',
+        has_recording: true,
+        recording_error: null,
+    };
+}
+export function applyRecordingError(model, message) {
+    return {
+        ...model,
+        flow: 'step_3_retell_ready',
+        has_recording: false,
+        recording_error: message,
+        review: null,
+    };
+}
+export function startRecordingAnalysis(model) {
+    return {
+        ...model,
+        flow: 'analyzing',
+        recording_error: null,
+        review: null,
+    };
+}
+export function applyAnalysisResult(model, review) {
+    return {
+        ...model,
+        flow: 'review',
+        has_recording: true,
+        recording_error: null,
+        review,
+    };
+}
+export function applyAnalysisError(model, message) {
+    return {
+        ...model,
+        flow: 'recorded',
+        has_recording: true,
+        recording_error: message,
+        review: null,
+    };
+}
+export function resetRecording(model) {
+    return {
+        ...model,
+        flow: 'step_3_retell_ready',
+        has_recording: false,
+        recording_error: null,
+        review: null,
+    };
 }

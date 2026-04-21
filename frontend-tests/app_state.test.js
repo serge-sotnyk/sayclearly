@@ -2,13 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  applyAnalysisError,
+  applyAnalysisResult,
   applyLoadedConfig,
   applyGeneratedExercise,
   applyGenerationError,
+  applyRecordingError,
   advanceExerciseStep,
   buildConfigUpdatePayload,
   buildGenerateRequest,
   createInitialAppModel,
+  markRecordingStarted,
+  resetRecording,
+  startRecordingAnalysis,
+  startRecordingRequest,
+  storeRecordedAudio,
   syncAnalysisLanguage,
 } from '../src/sayclearly/static/dist/app_state.js';
 
@@ -36,6 +44,27 @@ const publicConfig = {
   },
 };
 
+const review = {
+  summary: 'Strong retelling with a few rushed phrases.',
+  clarity: 'Mostly clear consonants with occasional dropped endings.',
+  pace: 'A little too fast in the middle section.',
+  hesitations: ['Paused before the last sentence'],
+  recommendations: ['Slow down after the first sentence', 'Finish final consonants more clearly'],
+};
+
+function createRetellingReadyModel() {
+  const exercise = {
+    language: 'uk',
+    analysis_language: 'uk',
+    topic_prompt: 'Morning routines',
+    text: 'Wake up, stretch, and greet the day clearly.',
+  };
+
+  return advanceExerciseStep(
+    advanceExerciseStep(applyGeneratedExercise(createInitialAppModel(), exercise)),
+  );
+}
+
 test('syncAnalysisLanguage copies text language when toggle is enabled', () => {
   const settings = {
     text_language: 'pl',
@@ -53,7 +82,7 @@ test('syncAnalysisLanguage copies text language when toggle is enabled', () => {
 
 test('applyGeneratedExercise moves flow to step_1_slow', () => {
   const exercise = {
-    text_language: 'uk',
+    language: 'uk',
     analysis_language: 'uk',
     topic_prompt: 'Morning routines',
     text: 'Wake up, stretch, and greet the day clearly.',
@@ -68,7 +97,7 @@ test('applyGeneratedExercise moves flow to step_1_slow', () => {
 
 test('advanceExerciseStep stops at step_3_retell_ready', () => {
   const exercise = {
-    text_language: 'uk',
+    language: 'uk',
     analysis_language: 'uk',
     topic_prompt: 'A mountain trail',
     text: 'First read slowly, then naturally, then retell it.',
@@ -162,4 +191,65 @@ test('buildConfigUpdatePayload preserves stored last_topic_prompt when reusing a
       secret_key: null,
     },
   });
+});
+
+test('startRecordingRequest moves to requesting_microphone and clears stale recording state', () => {
+  const staleModel = {
+    ...createRetellingReadyModel(),
+    has_recording: true,
+    recording_error: 'Microphone blocked',
+    review,
+  };
+
+  const updatedModel = startRecordingRequest(staleModel);
+
+  assert.equal(updatedModel.flow, 'requesting_microphone');
+  assert.equal(updatedModel.has_recording, false);
+  assert.equal(updatedModel.recording_error, null);
+  assert.equal(updatedModel.review, null);
+});
+
+test('storeRecordedAudio after recording start ends in recorded with a saved recording flag', () => {
+  const updatedModel = storeRecordedAudio(
+    markRecordingStarted(startRecordingRequest(createRetellingReadyModel())),
+  );
+
+  assert.equal(updatedModel.flow, 'recorded');
+  assert.equal(updatedModel.has_recording, true);
+  assert.equal(updatedModel.recording_error, null);
+});
+
+test('applyAnalysisError clears stale review data and preserves the recording flag', () => {
+  const recordedModel = storeRecordedAudio(
+    markRecordingStarted(startRecordingRequest(createRetellingReadyModel())),
+  );
+  const reviewedModel = applyAnalysisResult(startRecordingAnalysis(recordedModel), review);
+  const analyzingModel = startRecordingAnalysis(reviewedModel);
+
+  assert.equal(analyzingModel.review, null);
+
+  const updatedModel = applyAnalysisError(analyzingModel, 'Upload failed');
+
+  assert.equal(updatedModel.flow, 'recorded');
+  assert.equal(updatedModel.has_recording, true);
+  assert.equal(updatedModel.recording_error, 'Upload failed');
+  assert.equal(updatedModel.review, null);
+});
+
+test('applyAnalysisResult enters review and resetRecording clears recording state', () => {
+  const recordedModel = storeRecordedAudio(
+    markRecordingStarted(startRecordingRequest(createRetellingReadyModel())),
+  );
+  const reviewedModel = applyAnalysisResult(startRecordingAnalysis(recordedModel), review);
+  const resetModel = resetRecording(reviewedModel);
+
+  assert.equal(reviewedModel.flow, 'review');
+  assert.equal(reviewedModel.has_recording, true);
+  assert.deepEqual(reviewedModel.review, review);
+  assert.equal(reviewedModel.recording_error, null);
+
+  assert.equal(resetModel.flow, 'step_3_retell_ready');
+  assert.equal(resetModel.has_recording, false);
+  assert.equal(resetModel.review, null);
+  assert.equal(resetModel.recording_error, null);
 });

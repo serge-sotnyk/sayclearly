@@ -48,6 +48,7 @@ class FakeClassList {
 class FakeElement {
   constructor(initial = {}) {
     this.value = initial.value ?? '';
+    this.src = initial.src ?? '';
     this.checked = initial.checked ?? false;
     this.hidden = initial.hidden ?? false;
     this.textContent = initial.textContent ?? '';
@@ -90,6 +91,54 @@ class FakeRoot extends FakeElement {
 
   querySelector(selector) {
     return this.elements.get(selector) ?? null;
+  }
+}
+
+class FakeRecorder {
+  constructor(recordedBlob) {
+    this.recordedBlob = recordedBlob;
+    this.listeners = new Map();
+  }
+
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) ?? [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  emit(type, event = {}) {
+    const listeners = this.listeners.get(type) ?? [];
+    for (const listener of listeners) {
+      listener(event);
+    }
+  }
+
+  start() {
+    this.emit('dataavailable', { data: this.recordedBlob });
+  }
+
+  stop() {
+    this.emit('stop');
+  }
+}
+
+class FakeTrack {
+  constructor() {
+    this.stopCalls = 0;
+  }
+
+  stop() {
+    this.stopCalls += 1;
+  }
+}
+
+class FakeStream {
+  constructor(tracks = [new FakeTrack()]) {
+    this.tracks = tracks;
+  }
+
+  getTracks() {
+    return this.tracks;
   }
 }
 
@@ -150,6 +199,19 @@ function createShell() {
     ['[data-exercise-text]', new FakeElement()],
     ['[data-reset-button]', new FakeElement()],
     ['[data-next-step-button]', new FakeElement()],
+    ['[data-recording-controls]', new FakeElement({ hidden: true })],
+    ['[data-recording-status]', new FakeElement()],
+    ['[data-start-recording-button]', new FakeElement()],
+    ['[data-stop-recording-button]', new FakeElement({ hidden: true })],
+    ['[data-analyze-recording-button]', new FakeElement({ hidden: true })],
+    ['[data-record-again-button]', new FakeElement({ hidden: true })],
+    ['[data-recording-preview]', new FakeElement({ hidden: true })],
+    ['[data-review-panel]', new FakeElement({ hidden: true })],
+    ['[data-review-summary]', new FakeElement()],
+    ['[data-review-clarity]', new FakeElement()],
+    ['[data-review-pace]', new FakeElement()],
+    ['[data-review-hesitations]', new FakeElement()],
+    ['[data-review-recommendations]', new FakeElement()],
     ['[data-settings-status]', new FakeElement()],
     ['[data-clear-api-key-button]', new FakeElement()],
     ['[data-close-settings-button]', new FakeElement()],
@@ -197,6 +259,43 @@ function createFetchStub(...responses) {
   };
 
   return { fetchStub, calls };
+}
+
+function createRecordingApi(recordedBlob = new Blob(['voice sample'], { type: 'audio/webm' })) {
+  const stream = new FakeStream();
+  let recorder = null;
+
+  return {
+    stream,
+    get recorder() {
+      return recorder;
+    },
+    isSupported() {
+      return true;
+    },
+    async getUserMedia() {
+      return stream;
+    },
+    createMediaRecorder() {
+      recorder = new FakeRecorder(recordedBlob);
+      return recorder;
+    },
+    createObjectURL() {
+      return 'blob:retelling';
+    },
+    revokeObjectURL() {},
+  };
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve, reject };
 }
 
 test('startApp loads config, renders the shell, and keeps languages synced while enabled', async () => {
@@ -372,4 +471,155 @@ test('startApp shows friendly messages for load, generate, and clear failures', 
   await startApp(clearShell.document, clearFetch);
   await clearShell.elements.get('[data-clear-api-key-button]').click();
   assert.match(clearShell.elements.get('[data-settings-status]').textContent, /could not clear/i);
+});
+
+test('startApp records, uploads, renders review, and clears review on record again', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const review = {
+    summary: 'Clear retelling with a few rushed transitions.',
+    clarity: 'Mostly clear.',
+    pace: 'Slightly fast near the end.',
+    hesitations: ['A short pause before the final sentence.'],
+    recommendations: ['Slow down the ending.', 'Keep sentence openings steady.'],
+  };
+  const { fetchStub, calls } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+    createResponse(review),
+  );
+  const recordingApi = createRecordingApi();
+
+  await startApp(shell.document, fetchStub, recordingApi);
+  await shell.elements.get('[data-generate-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+
+  await shell.elements.get('[data-start-recording-button]').click();
+  assert.match(shell.elements.get('[data-recording-status]').textContent, /recording/i);
+
+  await shell.elements.get('[data-stop-recording-button]').click();
+  assert.equal(shell.elements.get('[data-recording-preview]').hidden, false);
+  assert.equal(shell.elements.get('[data-recording-preview]').src, 'blob:retelling');
+  assert.equal(recordingApi.stream.getTracks()[0].stopCalls, 1);
+
+  await shell.elements.get('[data-analyze-recording-button]').click();
+
+  assert.equal(calls[3].url, '/api/analyze-recording');
+  assert.equal(shell.elements.get('[data-review-panel]').hidden, false);
+  assert.equal(shell.elements.get('[data-review-summary]').textContent, review.summary);
+
+  await shell.elements.get('[data-record-again-button]').click();
+  assert.equal(shell.elements.get('[data-review-panel]').hidden, true);
+  assert.equal(shell.elements.get('[data-recording-preview]').hidden, true);
+});
+
+test('startApp releases microphone tracks when reset interrupts recording', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const { fetchStub } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+  );
+  const recordingApi = createRecordingApi();
+
+  await startApp(shell.document, fetchStub, recordingApi);
+  await shell.elements.get('[data-generate-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-start-recording-button]').click();
+
+  await shell.elements.get('[data-reset-button]').click();
+
+  assert.equal(recordingApi.stream.getTracks()[0].stopCalls, 1);
+});
+
+test('startApp ignores a stale recorder stop after reset clears the recording', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const { fetchStub } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+  );
+  const recordingApi = createRecordingApi();
+
+  await startApp(shell.document, fetchStub, recordingApi);
+  await shell.elements.get('[data-generate-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-start-recording-button]').click();
+
+  const staleRecorder = recordingApi.recorder;
+  await shell.elements.get('[data-reset-button]').click();
+  staleRecorder.stop();
+
+  assert.equal(shell.elements.get('[data-recording-preview]').hidden, true);
+  assert.equal(shell.elements.get('[data-recording-preview]').src, '');
+  assert.equal(shell.elements.get('[data-status-message]').textContent, 'Ready to generate a guided exercise.');
+});
+
+test('startApp ignores an outdated permission request after reset clears the exercise', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const { fetchStub } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+  );
+  const recordingApi = createRecordingApi();
+  const pendingPermission = createDeferred();
+  let recorderCreations = 0;
+
+  recordingApi.getUserMedia = async () => await pendingPermission.promise;
+  recordingApi.createMediaRecorder = () => {
+    recorderCreations += 1;
+    return new FakeRecorder(new Blob(['voice sample'], { type: 'audio/webm' }));
+  };
+
+  await startApp(shell.document, fetchStub, recordingApi);
+  await shell.elements.get('[data-generate-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+
+  const startPromise = shell.elements.get('[data-start-recording-button]').click();
+  await shell.elements.get('[data-reset-button]').click();
+  pendingPermission.resolve(recordingApi.stream);
+  await startPromise;
+
+  assert.equal(recorderCreations, 0);
+  assert.equal(shell.elements.get('[data-recording-controls]').hidden, true);
+  assert.equal(shell.elements.get('[data-recording-preview]').hidden, true);
+  assert.equal(shell.elements.get('[data-status-message]').textContent, 'Ready to generate a guided exercise.');
+});
+
+test('startApp preserves the recorded retelling when upload fails', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const { fetchStub } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+    new Error('upload failed'),
+  );
+
+  await startApp(shell.document, fetchStub, createRecordingApi());
+  await shell.elements.get('[data-generate-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-start-recording-button]').click();
+  await shell.elements.get('[data-stop-recording-button]').click();
+
+  await shell.elements.get('[data-analyze-recording-button]').click();
+
+  assert.equal(shell.elements.get('[data-recording-preview]').hidden, false);
+  assert.equal(shell.elements.get('[data-analyze-recording-button]').hidden, false);
+  assert.match(shell.elements.get('[data-recording-status]').textContent, /could not upload/i);
 });

@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sayclearly.config.api import build_config_router
 from sayclearly.exercise.api import build_exercise_router
 from sayclearly.history.api import build_history_router
+from sayclearly.recording.api import build_recording_router
 from sayclearly.web.errors import install_error_handlers
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -25,6 +26,7 @@ def create_app(data_root: Path | None = None) -> FastAPI:
     app.include_router(build_config_router(data_root))
     app.include_router(build_exercise_router(data_root))
     app.include_router(build_history_router(data_root))
+    app.include_router(build_recording_router(data_root))
 
     @app.get("/")
     def home(request: Request):

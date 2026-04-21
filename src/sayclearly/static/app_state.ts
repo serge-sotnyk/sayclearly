@@ -4,6 +4,11 @@ export type FlowState =
   | 'step_1_slow'
   | 'step_2_natural'
   | 'step_3_retell_ready'
+  | 'requesting_microphone'
+  | 'recording'
+  | 'recorded'
+  | 'analyzing'
+  | 'review'
   | 'error';
 
 type ConfigSource = 'env' | 'stored' | 'none';
@@ -51,6 +56,14 @@ export interface GeneratedExercise {
   text: string;
 }
 
+export interface RecordingReview {
+  summary: string;
+  clarity: string;
+  pace: string;
+  hesitations: string[];
+  recommendations: string[];
+}
+
 interface GenerateRequest {
   language: string;
   analysis_language: string;
@@ -82,6 +95,9 @@ export interface AppModel {
   config: PublicConfig;
   settings: SettingsFormState;
   generated_exercise: GeneratedExercise | null;
+  has_recording: boolean;
+  recording_error: string | null;
+  review: RecordingReview | null;
   error_message: string | null;
 }
 
@@ -125,6 +141,9 @@ export function createInitialAppModel(): AppModel {
     config: DEFAULT_CONFIG,
     settings: buildSettingsFromConfig(DEFAULT_CONFIG),
     generated_exercise: null,
+    has_recording: false,
+    recording_error: null,
+    review: null,
     error_message: null,
   };
 }
@@ -204,6 +223,9 @@ export function applyGeneratedExercise(model: AppModel, exercise: GeneratedExerc
     ...model,
     flow: 'step_1_slow',
     generated_exercise: exercise,
+    has_recording: false,
+    recording_error: null,
+    review: null,
     error_message: null,
   };
 }
@@ -225,4 +247,80 @@ export function advanceExerciseStep(model: AppModel): AppModel {
     default:
       return model;
   }
+}
+
+export function startRecordingRequest(model: AppModel): AppModel {
+  return {
+    ...model,
+    flow: 'requesting_microphone',
+    has_recording: false,
+    recording_error: null,
+    review: null,
+  };
+}
+
+export function markRecordingStarted(model: AppModel): AppModel {
+  return {
+    ...model,
+    flow: 'recording',
+    recording_error: null,
+  };
+}
+
+export function storeRecordedAudio(model: AppModel): AppModel {
+  return {
+    ...model,
+    flow: 'recorded',
+    has_recording: true,
+    recording_error: null,
+  };
+}
+
+export function applyRecordingError(model: AppModel, message: string): AppModel {
+  return {
+    ...model,
+    flow: 'step_3_retell_ready',
+    has_recording: false,
+    recording_error: message,
+    review: null,
+  };
+}
+
+export function startRecordingAnalysis(model: AppModel): AppModel {
+  return {
+    ...model,
+    flow: 'analyzing',
+    recording_error: null,
+    review: null,
+  };
+}
+
+export function applyAnalysisResult(model: AppModel, review: RecordingReview): AppModel {
+  return {
+    ...model,
+    flow: 'review',
+    has_recording: true,
+    recording_error: null,
+    review,
+  };
+}
+
+export function applyAnalysisError(model: AppModel, message: string): AppModel {
+  return {
+    ...model,
+    flow: 'recorded',
+    has_recording: true,
+    recording_error: message,
+    review: null,
+  };
+}
+
+export function resetRecording(model: AppModel): AppModel {
+  return {
+    ...model,
+    flow: 'step_3_retell_ready',
+    has_recording: false,
+    recording_error: null,
+    review: null,
+  };
 }

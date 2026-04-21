@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 BAD_REQUEST_VALIDATION_ROUTES = {
     ("POST", "/api/config"),
     ("POST", "/api/history"),
+    ("POST", "/api/analyze-recording"),
 }
 BAD_REQUEST_VALIDATION_TYPES = {
     "extra_forbidden",

@@ -29,6 +29,33 @@ def test_home_page_renders_stage_3_shell() -> None:
     assert "/static/dist/app.js" in response.text
 
 
+def test_home_page_renders_stage_4_recording_hooks() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "data-recording-controls" in response.text
+    assert "data-recording-status" in response.text
+    assert "data-start-recording-button" in response.text
+    assert "data-stop-recording-button" in response.text
+    assert "data-recording-preview" in response.text
+    assert "data-analyze-recording-button" in response.text
+    assert "data-record-again-button" in response.text
+    assert "data-review-panel" in response.text
+    assert "data-review-summary" in response.text
+    assert "data-review-clarity" in response.text
+    assert "data-review-pace" in response.text
+    assert "data-review-hesitations" in response.text
+    assert "data-review-recommendations" in response.text
+    assert "hidden data-start-recording-button" in response.text
+    assert "hidden data-stop-recording-button" in response.text
+    assert "hidden data-analyze-recording-button" in response.text
+    assert "hidden data-record-again-button" in response.text
+    assert "controls hidden data-recording-preview" in response.text
+    assert 'class="review-panel" hidden data-review-panel aria-live="polite"' in response.text
+
+
 def test_home_page_uses_root_path_for_stage_3_bundle() -> None:
     client = TestClient(create_app(), root_path="/sayclearly")
 

@@ -1,4 +1,4 @@
-import { advanceExerciseStep, applyGeneratedExercise, applyGenerationError, applyLoadedConfig, buildConfigUpdatePayload, buildGenerateRequest, createInitialAppModel, startGeneration, syncAnalysisLanguage, } from './app_state.js';
+import { advanceExerciseStep, applyAnalysisError, applyAnalysisResult, applyGeneratedExercise, applyGenerationError, applyLoadedConfig, applyRecordingError, buildConfigUpdatePayload, buildGenerateRequest, createInitialAppModel, markRecordingStarted, resetRecording, startRecordingAnalysis, startRecordingRequest, startGeneration, storeRecordedAudio, syncAnalysisLanguage, } from './app_state.js';
 const READY_STATUS = 'Ready to generate a guided exercise.';
 const LOADING_STATUS = 'Loading your saved settings...';
 const GENERATING_STATUS = 'Generating your guided exercise...';
@@ -30,6 +30,27 @@ const STEP_CONTENT = {
         nextButtonDisabled: true,
     },
 };
+function createDefaultRecordingApi() {
+    return {
+        isSupported() {
+            return (typeof navigator !== 'undefined' &&
+                typeof navigator.mediaDevices?.getUserMedia === 'function' &&
+                typeof MediaRecorder !== 'undefined');
+        },
+        async getUserMedia() {
+            return await navigator.mediaDevices.getUserMedia({ audio: true });
+        },
+        createMediaRecorder(stream) {
+            return new MediaRecorder(stream);
+        },
+        createObjectURL(blob) {
+            return URL.createObjectURL(blob);
+        },
+        revokeObjectURL(url) {
+            URL.revokeObjectURL(url);
+        },
+    };
+}
 function getRequiredElement(root, selector) {
     const element = root.querySelector(selector);
     if (!element) {
@@ -56,6 +77,19 @@ function collectShellElements(root) {
         generateButton: getRequiredElement(root, '[data-generate-button]'),
         resetButton: getRequiredElement(root, '[data-reset-button]'),
         nextStepButton: getRequiredElement(root, '[data-next-step-button]'),
+        recordingControls: getRequiredElement(root, '[data-recording-controls]'),
+        recordingStatus: getRequiredElement(root, '[data-recording-status]'),
+        startRecordingButton: getRequiredElement(root, '[data-start-recording-button]'),
+        stopRecordingButton: getRequiredElement(root, '[data-stop-recording-button]'),
+        analyzeRecordingButton: getRequiredElement(root, '[data-analyze-recording-button]'),
+        recordAgainButton: getRequiredElement(root, '[data-record-again-button]'),
+        recordingPreview: getRequiredElement(root, '[data-recording-preview]'),
+        reviewPanel: getRequiredElement(root, '[data-review-panel]'),
+        reviewSummary: getRequiredElement(root, '[data-review-summary]'),
+        reviewClarity: getRequiredElement(root, '[data-review-clarity]'),
+        reviewPace: getRequiredElement(root, '[data-review-pace]'),
+        reviewHesitations: getRequiredElement(root, '[data-review-hesitations]'),
+        reviewRecommendations: getRequiredElement(root, '[data-review-recommendations]'),
         stepLabel: getRequiredElement(root, '[data-step-label]'),
         stepTitle: getRequiredElement(root, '[data-step-title]'),
         stepInstruction: getRequiredElement(root, '[data-step-instruction]'),
@@ -107,19 +141,22 @@ function buildConfigRequest(config, settings, apiKeyValue) {
     };
 }
 async function requestJson(fetchImpl, url, options) {
-    const response = await fetchImpl(url, {
-        headers: {
+    const headers = options?.body instanceof FormData
+        ? { ...(options?.headers ?? {}) }
+        : {
             'Content-Type': 'application/json',
             ...(options?.headers ?? {}),
-        },
+        };
+    const response = await fetchImpl(url, {
         ...options,
+        headers,
     });
     if (!response.ok) {
         throw new Error(`Request failed: ${url}`);
     }
     return (await response.json());
 }
-function render(elements, model, isSettingsOpen, reuseNextGeneration) {
+function render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl) {
     elements.textLanguageInput.value = model.settings.text_language;
     elements.analysisLanguageInput.value = model.settings.analysis_language;
     elements.sameLanguageToggle.checked = model.settings.same_language_for_analysis;
@@ -129,16 +166,64 @@ function render(elements, model, isSettingsOpen, reuseNextGeneration) {
     elements.settingsPanel.hidden = !isSettingsOpen;
     const generatedExercise = model.generated_exercise;
     const hasExercise = generatedExercise !== null;
+    const showRecordingControls = hasExercise &&
+        [
+            'step_3_retell_ready',
+            'requesting_microphone',
+            'recording',
+            'recorded',
+            'analyzing',
+            'review',
+        ].includes(model.flow);
     elements.setupScreen.hidden = hasExercise;
     elements.exerciseScreen.hidden = !hasExercise;
     elements.generateButton.disabled = model.flow === 'generating_text';
     elements.reuseTopicButton.disabled = model.flow === 'generating_text';
+    elements.recordingControls.hidden = !showRecordingControls;
+    elements.startRecordingButton.hidden = model.flow !== 'step_3_retell_ready';
+    elements.stopRecordingButton.hidden = model.flow !== 'recording';
+    elements.analyzeRecordingButton.hidden = model.flow !== 'recorded';
+    elements.recordAgainButton.hidden = !['recorded', 'review'].includes(model.flow);
+    elements.recordingPreview.hidden = recordedUrl === null;
+    elements.recordingPreview.src = recordedUrl ?? '';
+    elements.reviewPanel.hidden = model.review === null;
+    elements.reviewSummary.textContent = model.review?.summary ?? '';
+    elements.reviewClarity.textContent = model.review?.clarity ?? '';
+    elements.reviewPace.textContent = model.review?.pace ?? '';
+    elements.reviewHesitations.textContent = model.review?.hesitations.join('\n') ?? '';
+    elements.reviewRecommendations.textContent = model.review?.recommendations.join('\n') ?? '';
+    if (model.recording_error) {
+        elements.recordingStatus.textContent = model.recording_error;
+    }
+    else {
+        switch (model.flow) {
+            case 'requesting_microphone':
+                elements.recordingStatus.textContent = 'Requesting microphone access...';
+                break;
+            case 'recording':
+                elements.recordingStatus.textContent = 'Recording in progress. Stop when your retelling is complete.';
+                break;
+            case 'recorded':
+                elements.recordingStatus.textContent = 'Recording ready. Listen back or upload it for feedback.';
+                break;
+            case 'analyzing':
+                elements.recordingStatus.textContent = 'Uploading your recording for feedback...';
+                break;
+            case 'review':
+                elements.recordingStatus.textContent = 'Review ready. Record again when you want another attempt.';
+                break;
+            default:
+                elements.recordingStatus.textContent = 'Record your retelling when you are ready.';
+                break;
+        }
+    }
     if (!hasExercise) {
         elements.stepLabel.textContent = STEP_CONTENT.step_1_slow.label;
         elements.stepTitle.textContent = STEP_CONTENT.step_1_slow.title;
         elements.stepInstruction.textContent = STEP_CONTENT.step_1_slow.instruction;
         elements.nextStepButton.textContent = STEP_CONTENT.step_1_slow.nextButtonLabel;
         elements.nextStepButton.disabled = STEP_CONTENT.step_1_slow.nextButtonDisabled;
+        elements.nextStepButton.hidden = false;
         elements.exerciseText.textContent = EXERCISE_PLACEHOLDER;
         return;
     }
@@ -148,9 +233,10 @@ function render(elements, model, isSettingsOpen, reuseNextGeneration) {
     elements.stepInstruction.textContent = stepContent.instruction;
     elements.nextStepButton.textContent = stepContent.nextButtonLabel;
     elements.nextStepButton.disabled = stepContent.nextButtonDisabled;
+    elements.nextStepButton.hidden = showRecordingControls;
     elements.exerciseText.textContent = generatedExercise.text;
 }
-export async function startApp(documentRef = document, fetchImpl = fetch) {
+export async function startApp(documentRef = document, fetchImpl = fetch, recordingApi = createDefaultRecordingApi()) {
     const root = documentRef.querySelector('[data-app-root]');
     if (!root) {
         return;
@@ -159,23 +245,47 @@ export async function startApp(documentRef = document, fetchImpl = fetch) {
     let model = createInitialAppModel();
     let isSettingsOpen = false;
     let reuseNextGeneration = false;
+    let activeRecorder = null;
+    let activeStream = null;
+    let activeRecorderToken = 0;
+    let recordedBlob = null;
+    let recordedUrl = null;
+    const stopStream = (stream) => {
+        for (const track of stream?.getTracks() ?? []) {
+            track.stop();
+        }
+    };
+    const stopActiveStream = () => {
+        stopStream(activeStream);
+        activeStream = null;
+    };
+    const clearRecordingArtifacts = () => {
+        activeRecorderToken += 1;
+        activeRecorder = null;
+        stopActiveStream();
+        recordedBlob = null;
+        if (recordedUrl !== null) {
+            recordingApi.revokeObjectURL(recordedUrl);
+            recordedUrl = null;
+        }
+    };
     const updateSettings = (nextSettings) => {
         model = {
             ...model,
             settings: nextSettings,
         };
-        render(elements, model, isSettingsOpen, reuseNextGeneration);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     };
     const refreshFromInputs = () => {
         updateSettings(readSettings(elements, reuseNextGeneration));
     };
     elements.openSettingsButton.addEventListener('click', () => {
         isSettingsOpen = true;
-        render(elements, model, isSettingsOpen, reuseNextGeneration);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.closeSettingsButton.addEventListener('click', () => {
         isSettingsOpen = false;
-        render(elements, model, isSettingsOpen, reuseNextGeneration);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.textLanguageInput.addEventListener('input', () => {
         refreshFromInputs();
@@ -198,13 +308,106 @@ export async function startApp(documentRef = document, fetchImpl = fetch) {
     });
     elements.nextStepButton.addEventListener('click', () => {
         model = advanceExerciseStep(model);
-        render(elements, model, isSettingsOpen, reuseNextGeneration);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    });
+    elements.startRecordingButton.addEventListener('click', async () => {
+        if (!recordingApi.isSupported()) {
+            model = applyRecordingError(model, 'This browser does not support microphone recording.');
+            render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            return;
+        }
+        model = startRecordingRequest(model);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        const recorderToken = activeRecorderToken + 1;
+        activeRecorderToken = recorderToken;
+        try {
+            const stream = await recordingApi.getUserMedia();
+            if (recorderToken !== activeRecorderToken) {
+                stopStream(stream);
+                return;
+            }
+            activeStream = stream;
+            const recorder = recordingApi.createMediaRecorder(stream);
+            const chunks = [];
+            activeRecorder = recorder;
+            recorder.addEventListener('dataavailable', (event) => {
+                if (recorderToken !== activeRecorderToken) {
+                    return;
+                }
+                if (event.data) {
+                    chunks.push(event.data);
+                }
+            });
+            recorder.addEventListener('stop', () => {
+                if (recorderToken !== activeRecorderToken) {
+                    return;
+                }
+                activeRecorder = null;
+                stopActiveStream();
+                const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
+                if (blob.size === 0) {
+                    clearRecordingArtifacts();
+                    model = applyRecordingError(model, 'No recording was captured. Please try again.');
+                    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+                    return;
+                }
+                if (recordedUrl !== null) {
+                    recordingApi.revokeObjectURL(recordedUrl);
+                }
+                recordedBlob = blob;
+                recordedUrl = recordingApi.createObjectURL(blob);
+                model = storeRecordedAudio(model);
+                render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            });
+            recorder.start();
+            model = markRecordingStarted(model);
+        }
+        catch {
+            if (recorderToken !== activeRecorderToken) {
+                return;
+            }
+            activeRecorder = null;
+            stopActiveStream();
+            model = applyRecordingError(model, 'Microphone access was unavailable. Please try again.');
+        }
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    });
+    elements.stopRecordingButton.addEventListener('click', () => {
+        activeRecorder?.stop();
+    });
+    elements.analyzeRecordingButton.addEventListener('click', async () => {
+        if (recordedBlob === null) {
+            model = applyRecordingError(model, 'No recording was captured. Please try again.');
+            render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            return;
+        }
+        model = startRecordingAnalysis(model);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        try {
+            const formData = new FormData();
+            formData.append('audio', recordedBlob, 'retelling.webm');
+            const review = await requestJson(fetchImpl, '/api/analyze-recording', {
+                method: 'POST',
+                body: formData,
+            });
+            model = applyAnalysisResult(model, review);
+        }
+        catch {
+            model = applyAnalysisError(model, 'Could not upload the recording. Try again.');
+        }
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    });
+    elements.recordAgainButton.addEventListener('click', () => {
+        clearRecordingArtifacts();
+        model = resetRecording(model);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.resetButton.addEventListener('click', () => {
         reuseNextGeneration = false;
+        clearRecordingArtifacts();
         const resetModel = createInitialAppModel();
         model = applyLoadedConfig(resetModel, model.config);
-        render(elements, model, isSettingsOpen, reuseNextGeneration);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.clearApiKeyButton.addEventListener('click', async () => {
         try {
@@ -217,7 +420,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch) {
                 error_message: null,
             };
             elements.apiKeyInput.value = '';
-            render(elements, model, isSettingsOpen, reuseNextGeneration);
+            render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
         }
         catch {
             elements.settingsStatus.textContent = CLEAR_ERROR_STATUS;
@@ -230,7 +433,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch) {
             settings,
         };
         model = startGeneration(model);
-        render(elements, model, isSettingsOpen, reuseNextGeneration);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
         try {
             const savedConfig = await requestJson(fetchImpl, '/api/config', {
                 method: 'POST',
@@ -248,13 +451,13 @@ export async function startApp(documentRef = document, fetchImpl = fetch) {
             reuseNextGeneration = false;
             model = applyGenerationError(model, GENERATE_ERROR_STATUS);
         }
-        render(elements, model, isSettingsOpen, reuseNextGeneration);
+        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     model = {
         ...model,
         error_message: LOADING_STATUS,
     };
-    render(elements, model, isSettingsOpen, reuseNextGeneration);
+    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     try {
         const config = await requestJson(fetchImpl, '/api/config', {
             method: 'GET',
@@ -272,7 +475,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch) {
             flow: 'home',
         };
     }
-    render(elements, model, isSettingsOpen, reuseNextGeneration);
+    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
 }
 if (typeof document !== 'undefined' && typeof fetch !== 'undefined') {
     void startApp();

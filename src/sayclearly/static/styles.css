@@ -191,6 +191,28 @@ input[type="checkbox"] {
     border: 1px solid rgba(82, 96, 109, 0.18);
 }
 
+.recording-panel,
+.review-panel {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 1rem;
+    background: rgba(252, 249, 243, 0.92);
+    border: 1px solid rgba(124, 92, 43, 0.16);
+}
+
+.recording-status,
+.review-copy {
+    margin: 0;
+    color: #52606d;
+    line-height: 1.6;
+}
+
+audio[data-recording-preview] {
+    width: 100%;
+}
+
 @media (max-width: 960px) {
     .shell-grid {
         grid-template-columns: 1fr;
