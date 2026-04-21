@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from sayclearly.config.api import build_config_router
+from sayclearly.exercise.api import build_exercise_router
 from sayclearly.history.api import build_history_router
 from sayclearly.web.errors import install_error_handlers
 
@@ -22,6 +23,7 @@ def create_app(data_root: Path | None = None) -> FastAPI:
     install_error_handlers(app)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(build_config_router(data_root))
+    app.include_router(build_exercise_router(data_root))
     app.include_router(build_history_router(data_root))
 
     @app.get("/")

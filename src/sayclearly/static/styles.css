@@ -1,7 +1,7 @@
 :root {
     color-scheme: light;
     font-family: Inter, "Segoe UI", sans-serif;
-    background: #f7f4ef;
+    background: #f3efe8;
     color: #1f2933;
 }
 
@@ -12,47 +12,212 @@
 body {
     margin: 0;
     min-height: 100vh;
-    display: grid;
-    place-items: center;
     background:
-        radial-gradient(circle at top, #fff9ef, #f7f4ef 50%),
-        #f7f4ef;
+        radial-gradient(circle at top, rgba(255, 249, 239, 0.95), transparent 40%),
+        linear-gradient(180deg, #f8f4ed 0%, #f0ebe3 100%);
+}
+
+body,
+button,
+input {
+    font: inherit;
+}
+
+button,
+input {
+    color: inherit;
 }
 
 .page-shell {
-    width: min(42rem, calc(100% - 2rem));
-    padding: 3rem;
-    border-radius: 1.5rem;
-    background: rgba(255, 255, 255, 0.86);
-    box-shadow: 0 1.5rem 4rem rgba(15, 23, 42, 0.08);
+    width: min(72rem, calc(100% - 2rem));
+    margin: 0 auto;
+    padding: 2rem 0 3rem;
 }
 
-.eyebrow {
-    margin: 0 0 0.75rem;
-    font-size: 0.85rem;
+.panel {
+    border: 1px solid rgba(138, 109, 59, 0.14);
+    border-radius: 1.5rem;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(12px);
+}
+
+.hero-panel,
+.status-banner,
+.screen-panel,
+.settings-panel {
+    padding: 1.5rem;
+}
+
+.hero-panel {
+    margin-bottom: 1rem;
+}
+
+.status-banner {
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+    margin-bottom: 1rem;
+    background: rgba(248, 241, 223, 0.95);
+}
+
+.shell-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(16rem, 0.8fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.panel-heading {
+    margin-bottom: 1rem;
+}
+
+.eyebrow,
+.section-kicker,
+.status-label,
+.step-label {
+    margin: 0 0 0.5rem;
+    font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #8a6d3b;
 }
 
-h1 {
+.status-label,
+.status-text,
+.step-instruction,
+.settings-status {
     margin: 0;
-    font-size: clamp(2.5rem, 6vw, 3.5rem);
 }
 
-.lead,
-.hint {
-    max-width: 36rem;
-    line-height: 1.6;
+h1,
+h2 {
+    margin: 0;
+}
+
+h1 {
+    font-size: clamp(2.4rem, 5vw, 3.8rem);
+}
+
+h2 {
+    font-size: 1.35rem;
 }
 
 .lead {
+    max-width: 42rem;
     margin: 1rem 0 0;
-    font-size: 1.1rem;
+    line-height: 1.6;
+    color: #52606d;
 }
 
-.hint {
-    margin: 1rem 0 0;
+.setup-form,
+.settings-actions {
+    display: grid;
+    gap: 1rem;
+}
+
+.field,
+.toggle-field {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.field span,
+.toggle-field span {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.toggle-field {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+}
+
+input {
+    width: 100%;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid rgba(82, 96, 109, 0.22);
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: #7c5c2b;
+}
+
+.exercise-text {
+    min-height: 13rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px dashed rgba(124, 92, 43, 0.3);
+    border-radius: 1rem;
+    background: rgba(252, 249, 243, 0.9);
+    line-height: 1.7;
+    color: #334e68;
+}
+
+.button-row,
+.settings-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.button {
+    min-height: 2.75rem;
+    padding: 0.75rem 1rem;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.button-primary {
+    background: #7c5c2b;
+    color: #fffdf9;
+}
+
+.button-secondary {
+    background: #ece3d4;
+    color: #523f21;
+}
+
+.button-ghost {
+    background: transparent;
     color: #52606d;
+    border: 1px solid rgba(82, 96, 109, 0.18);
+}
+
+@media (max-width: 960px) {
+    .shell-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .page-shell {
+        width: min(100%, calc(100% - 1rem));
+        padding: 1rem 0 2rem;
+    }
+
+    .hero-panel,
+    .status-banner,
+    .screen-panel,
+    .settings-panel {
+        padding: 1.25rem;
+    }
+
+    .status-banner,
+    .button-row,
+    .settings-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .button {
+        width: 100%;
+    }
 }
