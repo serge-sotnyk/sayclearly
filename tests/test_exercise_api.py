@@ -60,6 +60,8 @@ def test_post_generate_text_returns_400_for_invalid_payload_shape(tmp_path: Path
     )
 
     assert response.status_code == 400
+    assert isinstance(response.json()["detail"], list)
+    assert all(error["loc"][0] == "body" for error in response.json()["detail"])
 
 
 def test_exercise_router_returns_400_for_invalid_payload_shape_without_global_handler(
@@ -75,3 +77,22 @@ def test_exercise_router_returns_400_for_invalid_payload_shape_without_global_ha
     )
 
     assert response.status_code == 400
+    assert isinstance(response.json()["detail"], list)
+    assert all(error["loc"][0] == "body" for error in response.json()["detail"])
+
+
+def test_post_generate_text_returns_fastapi_style_error_for_malformed_json(
+    tmp_path: Path,
+) -> None:
+    client = TestClient(create_app(tmp_path))
+
+    response = client.post(
+        "/api/generate-text",
+        content='{"text_language": "en",',
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 400
+    assert isinstance(response.json()["detail"], list)
+    assert response.json()["detail"][0]["type"] == "json_invalid"
+    assert response.json()["detail"][0]["loc"][0] == "body"
