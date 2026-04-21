@@ -7,12 +7,14 @@ The MVP specification lives in `docs/sayclearly_mvp_spec_en.md`.
 ### Setup
 
 ```bash
+npm install
 uv sync
 ```
 
 ### Run
 
 ```bash
+npm run build:frontend
 uv run sayclearly
 ```
 
@@ -21,6 +23,7 @@ Running `uv run sayclearly` starts the local FastAPI server on `127.0.0.1:8008`,
 ### Development
 
 ```bash
+npm run test:frontend
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .

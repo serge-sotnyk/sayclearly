@@ -1,0 +1,339 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { startApp } from '../src/sayclearly/static/dist/app.js';
+
+class FakeClassList {
+  constructor() {
+    this.values = new Set();
+  }
+
+  add(...tokens) {
+    for (const token of tokens) {
+      this.values.add(token);
+    }
+  }
+
+  remove(...tokens) {
+    for (const token of tokens) {
+      this.values.delete(token);
+    }
+  }
+
+  toggle(token, force) {
+    if (force === true) {
+      this.values.add(token);
+      return true;
+    }
+
+    if (force === false) {
+      this.values.delete(token);
+      return false;
+    }
+
+    if (this.values.has(token)) {
+      this.values.delete(token);
+      return false;
+    }
+
+    this.values.add(token);
+    return true;
+  }
+
+  contains(token) {
+    return this.values.has(token);
+  }
+}
+
+class FakeElement {
+  constructor(initial = {}) {
+    this.value = initial.value ?? '';
+    this.checked = initial.checked ?? false;
+    this.hidden = initial.hidden ?? false;
+    this.textContent = initial.textContent ?? '';
+    this.disabled = initial.disabled ?? false;
+    this.listeners = new Map();
+    this.classList = new FakeClassList();
+  }
+
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) ?? [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  async dispatch(type) {
+    const listeners = this.listeners.get(type) ?? [];
+    for (const listener of listeners) {
+      await listener({ currentTarget: this, target: this, preventDefault() {} });
+    }
+  }
+
+  async click() {
+    await this.dispatch('click');
+  }
+
+  async input() {
+    await this.dispatch('input');
+  }
+
+  async change() {
+    await this.dispatch('change');
+  }
+}
+
+class FakeRoot extends FakeElement {
+  constructor(elements) {
+    super();
+    this.elements = elements;
+  }
+
+  querySelector(selector) {
+    return this.elements.get(selector) ?? null;
+  }
+}
+
+function createConfig(overrides = {}) {
+  return {
+    version: 1,
+    text_language: 'uk',
+    analysis_language: 'uk',
+    same_language_for_analysis: true,
+    ui_language: 'uk',
+    last_topic_prompt: 'Morning routines',
+    session_limit: 10,
+    keep_last_audio: false,
+    gemini: {
+      model: 'gemini-2.5-flash',
+      has_api_key: true,
+      api_key_source: 'stored',
+    },
+    langfuse: {
+      host: null,
+      enabled: false,
+      has_public_key: false,
+      has_secret_key: false,
+      public_key_source: 'none',
+      secret_key_source: 'none',
+    },
+    ...overrides,
+  };
+}
+
+function createExercise(overrides = {}) {
+  return {
+    text_language: 'uk',
+    analysis_language: 'uk',
+    topic_prompt: 'Morning routines',
+    text: 'Speak slowly first, then at a natural pace, then retell it from memory.',
+    ...overrides,
+  };
+}
+
+function createShell() {
+  const elements = new Map([
+    ['[data-open-settings-button]', new FakeElement()],
+    ['[data-status-message]', new FakeElement({ textContent: 'Ready to generate a guided exercise.' })],
+    ['[data-screen="setup"]', new FakeElement()],
+    ['[data-screen="exercise"]', new FakeElement()],
+    ['[data-settings-panel]', new FakeElement({ hidden: true })],
+    ['[data-api-key-input]', new FakeElement()],
+    ['[data-text-language-input]', new FakeElement()],
+    ['[data-analysis-language-input]', new FakeElement()],
+    ['[data-same-language-toggle]', new FakeElement({ checked: true })],
+    ['[data-topic-input]', new FakeElement()],
+    ['[data-reuse-topic-button]', new FakeElement()],
+    ['[data-generate-button]', new FakeElement()],
+    ['[data-step-label]', new FakeElement()],
+    ['[data-step-title]', new FakeElement()],
+    ['[data-step-instruction]', new FakeElement()],
+    ['[data-exercise-text]', new FakeElement()],
+    ['[data-reset-button]', new FakeElement()],
+    ['[data-next-step-button]', new FakeElement()],
+    ['[data-settings-status]', new FakeElement()],
+    ['[data-clear-api-key-button]', new FakeElement()],
+    ['[data-close-settings-button]', new FakeElement()],
+  ]);
+
+  const root = new FakeRoot(elements);
+  const document = {
+    querySelector(selector) {
+      if (selector === '[data-app-root]') {
+        return root;
+      }
+
+      return null;
+    },
+  };
+
+  return { document, root, elements };
+}
+
+function createResponse(body, ok = true, status = 200) {
+  return {
+    ok,
+    status,
+    async json() {
+      return body;
+    },
+  };
+}
+
+function createFetchStub(...responses) {
+  const calls = [];
+  const queue = [...responses];
+  const fetchStub = async (url, options = {}) => {
+    calls.push({ url, options });
+    const next = queue.shift();
+    if (next instanceof Error) {
+      throw next;
+    }
+
+    if (!next) {
+      throw new Error(`No stubbed response left for ${url}`);
+    }
+
+    return next;
+  };
+
+  return { fetchStub, calls };
+}
+
+test('startApp loads config, renders the shell, and keeps languages synced while enabled', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const { fetchStub } = createFetchStub(createResponse(config));
+
+  await startApp(shell.document, fetchStub);
+
+  assert.equal(shell.elements.get('[data-text-language-input]').value, 'uk');
+  assert.equal(shell.elements.get('[data-analysis-language-input]').value, 'uk');
+  assert.equal(shell.elements.get('[data-topic-input]').value, 'Morning routines');
+  assert.match(shell.elements.get('[data-settings-status]').textContent, /stored/i);
+  assert.equal(shell.elements.get('[data-settings-panel]').hidden, true);
+
+  await shell.elements.get('[data-open-settings-button]').click();
+  assert.equal(shell.elements.get('[data-settings-panel]').hidden, false);
+
+  shell.elements.get('[data-text-language-input]').value = 'pl';
+  await shell.elements.get('[data-text-language-input]').input();
+  assert.equal(shell.elements.get('[data-analysis-language-input]').value, 'pl');
+
+  shell.elements.get('[data-same-language-toggle]').checked = false;
+  await shell.elements.get('[data-same-language-toggle]').change();
+  shell.elements.get('[data-text-language-input]').value = 'de';
+  await shell.elements.get('[data-text-language-input]').input();
+  assert.equal(shell.elements.get('[data-analysis-language-input]').value, 'pl');
+
+  await shell.elements.get('[data-close-settings-button]').click();
+  assert.equal(shell.elements.get('[data-settings-panel]').hidden, true);
+});
+
+test('startApp saves config, generates text, advances steps, supports reuse, and resets home', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const { fetchStub, calls } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+  );
+
+  await startApp(shell.document, fetchStub);
+
+  shell.elements.get('[data-topic-input]').value = '';
+  await shell.elements.get('[data-reuse-topic-button]').click();
+  await shell.elements.get('[data-generate-button]').click();
+
+  assert.deepEqual(
+    calls.map((call) => call.url),
+    ['/api/config', '/api/config', '/api/generate-text'],
+  );
+  assert.deepEqual(JSON.parse(calls[1].options.body), {
+    ...config,
+    gemini: {
+      model: 'gemini-2.5-flash',
+      api_key: null,
+    },
+    langfuse: {
+      host: null,
+      public_key: null,
+      secret_key: null,
+    },
+  });
+  assert.deepEqual(JSON.parse(calls[2].options.body), {
+    text_language: 'uk',
+    analysis_language: 'uk',
+    topic_prompt: '',
+    reuse_last_topic: true,
+  });
+  assert.equal(shell.elements.get('[data-step-label]').textContent, 'Step 1 of 3');
+  assert.match(shell.elements.get('[data-step-title]').textContent, /warm-up/i);
+  assert.equal(shell.elements.get('[data-exercise-text]').textContent, exercise.text);
+
+  await shell.elements.get('[data-next-step-button]').click();
+  assert.equal(shell.elements.get('[data-step-label]').textContent, 'Step 2 of 3');
+
+  await shell.elements.get('[data-next-step-button]').click();
+  assert.equal(shell.elements.get('[data-step-label]').textContent, 'Step 3 of 3');
+
+  await shell.elements.get('[data-reset-button]').click();
+  assert.equal(shell.elements.get('[data-status-message]').textContent, 'Ready to generate a guided exercise.');
+  assert.match(shell.elements.get('[data-exercise-text]').textContent, /appear here/i);
+});
+
+test('startApp clears stored API keys and refreshes the rendered status', async () => {
+  const shell = createShell();
+  const loadedConfig = createConfig();
+  const clearedConfig = createConfig({
+    gemini: {
+      model: 'gemini-2.5-flash',
+      has_api_key: false,
+      api_key_source: 'none',
+    },
+  });
+  const { fetchStub, calls } = createFetchStub(
+    createResponse(loadedConfig),
+    createResponse(clearedConfig),
+  );
+
+  await startApp(shell.document, fetchStub);
+  await shell.elements.get('[data-clear-api-key-button]').click();
+
+  assert.deepEqual(
+    calls.map((call) => ({ url: call.url, method: call.options.method ?? 'GET' })),
+    [
+      { url: '/api/config', method: 'GET' },
+      { url: '/api/config/api-key', method: 'DELETE' },
+    ],
+  );
+  assert.match(shell.elements.get('[data-settings-status]').textContent, /not stored/i);
+});
+
+test('startApp shows friendly messages for load, generate, and clear failures', async () => {
+  const loadShell = createShell();
+  const generateShell = createShell();
+  const clearShell = createShell();
+
+  await startApp(loadShell.document, async () => {
+    throw new Error('load failed');
+  });
+  assert.match(loadShell.elements.get('[data-status-message]').textContent, /could not load/i);
+
+  const { fetchStub: generateFetch } = createFetchStub(
+    createResponse(createConfig()),
+    createResponse(createConfig()),
+    new Error('generation failed'),
+  );
+  await startApp(generateShell.document, generateFetch);
+  await generateShell.elements.get('[data-generate-button]').click();
+  assert.match(generateShell.elements.get('[data-status-message]').textContent, /could not generate/i);
+
+  const { fetchStub: clearFetch } = createFetchStub(
+    createResponse(createConfig()),
+    new Error('clear failed'),
+  );
+  await startApp(clearShell.document, clearFetch);
+  await clearShell.elements.get('[data-clear-api-key-button]').click();
+  assert.match(clearShell.elements.get('[data-settings-status]').textContent, /could not clear/i);
+});
