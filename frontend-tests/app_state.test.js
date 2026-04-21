@@ -109,18 +109,29 @@ test('buildGenerateRequest and buildConfigUpdatePayload preserve current config 
   };
 
   assert.deepEqual(buildGenerateRequest(settings), {
-    text_language: 'pl',
+    language: 'pl',
     analysis_language: 'pl',
     topic_prompt: 'Describe a quiet library',
     reuse_last_topic: true,
   });
 
   assert.deepEqual(buildConfigUpdatePayload(publicConfig, settings), {
-    ...publicConfig,
     text_language: 'pl',
     analysis_language: 'pl',
     same_language_for_analysis: true,
+    ui_language: 'uk',
     last_topic_prompt: 'Describe a quiet library',
+    session_limit: 8,
+    keep_last_audio: true,
+    gemini: {
+      model: 'gemini-2.5-flash',
+      api_key: null,
+    },
+    langfuse: {
+      host: 'https://langfuse.example',
+      public_key: null,
+      secret_key: null,
+    },
   });
 });
 
@@ -134,10 +145,21 @@ test('buildConfigUpdatePayload preserves stored last_topic_prompt when reusing a
   };
 
   assert.deepEqual(buildConfigUpdatePayload(publicConfig, settings), {
-    ...publicConfig,
     text_language: 'pl',
     analysis_language: 'en',
     same_language_for_analysis: false,
+    ui_language: 'uk',
     last_topic_prompt: 'Keep the original config topic',
+    session_limit: 8,
+    keep_last_audio: true,
+    gemini: {
+      model: 'gemini-2.5-flash',
+      api_key: null,
+    },
+    langfuse: {
+      host: 'https://langfuse.example',
+      public_key: null,
+      secret_key: null,
+    },
   });
 });

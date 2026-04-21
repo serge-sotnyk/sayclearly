@@ -58,7 +58,7 @@ export function applyLoadedConfig(model, config) {
 export function buildGenerateRequest(settings) {
     const syncedSettings = syncAnalysisLanguage(settings);
     return {
-        text_language: syncedSettings.text_language,
+        language: syncedSettings.text_language,
         analysis_language: syncedSettings.analysis_language,
         topic_prompt: syncedSettings.topic_prompt,
         reuse_last_topic: syncedSettings.reuse_last_topic,
@@ -70,11 +70,22 @@ export function buildConfigUpdatePayload(config, settings) {
         ? config.last_topic_prompt
         : syncedSettings.topic_prompt;
     return {
-        ...config,
         text_language: syncedSettings.text_language,
         analysis_language: syncedSettings.analysis_language,
         same_language_for_analysis: syncedSettings.same_language_for_analysis,
+        ui_language: config.ui_language,
         last_topic_prompt: lastTopicPrompt,
+        session_limit: config.session_limit,
+        keep_last_audio: config.keep_last_audio,
+        gemini: {
+            model: config.gemini.model,
+            api_key: null,
+        },
+        langfuse: {
+            host: config.langfuse.host,
+            public_key: null,
+            secret_key: null,
+        },
     };
 }
 export function startGeneration(model) {

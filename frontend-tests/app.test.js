@@ -122,7 +122,7 @@ function createConfig(overrides = {}) {
 
 function createExercise(overrides = {}) {
   return {
-    text_language: 'uk',
+    language: 'uk',
     analysis_language: 'uk',
     topic_prompt: 'Morning routines',
     text: 'Speak slowly first, then at a natural pace, then retell it from memory.',
@@ -250,7 +250,13 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
     ['/api/config', '/api/config', '/api/generate-text'],
   );
   assert.deepEqual(JSON.parse(calls[1].options.body), {
-    ...config,
+    text_language: 'uk',
+    analysis_language: 'uk',
+    same_language_for_analysis: true,
+    ui_language: 'uk',
+    last_topic_prompt: 'Morning routines',
+    session_limit: 10,
+    keep_last_audio: false,
     gemini: {
       model: 'gemini-2.5-flash',
       api_key: null,
@@ -262,7 +268,7 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
     },
   });
   assert.deepEqual(JSON.parse(calls[2].options.body), {
-    text_language: 'uk',
+    language: 'uk',
     analysis_language: 'uk',
     topic_prompt: '',
     reuse_last_topic: true,
@@ -305,7 +311,7 @@ test('startApp clears reuse intent when the user types a fresh topic before gene
   await shell.elements.get('[data-generate-button]').click();
 
   assert.deepEqual(JSON.parse(calls[2].options.body), {
-    text_language: 'uk',
+    language: 'uk',
     analysis_language: 'uk',
     topic_prompt: 'Fresh topic',
     reuse_last_topic: false,

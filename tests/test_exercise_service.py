@@ -15,7 +15,7 @@ def test_generate_text_reuses_last_topic_when_requested(tmp_path: Path) -> None:
 
     response = service.generate_text(
         ExerciseGenerationRequest(
-            text_language="en",
+            language="en",
             analysis_language="uk",
             topic_prompt="   ",
             reuse_last_topic=True,
@@ -32,7 +32,7 @@ def test_generate_text_returns_placeholder_reading_text_for_empty_topic(
 
     response = service.generate_text(
         ExerciseGenerationRequest(
-            text_language="en",
+            language="en",
             analysis_language="uk",
             topic_prompt="",
             reuse_last_topic=False,
@@ -43,3 +43,4 @@ def test_generate_text_returns_placeholder_reading_text_for_empty_topic(
 
     assert 5 <= len(sentences) <= 8
     assert "placeholder" in response.text.lower()
+    assert response.language == "en"

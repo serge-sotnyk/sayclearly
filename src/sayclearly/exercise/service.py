@@ -26,7 +26,7 @@ class ExerciseService:
             ]
         )
         return ExerciseGenerationResponse(
-            text_language=request.text_language,
+            language=request.language,
             analysis_language=request.analysis_language,
             topic_prompt=topic_prompt,
             text=text,

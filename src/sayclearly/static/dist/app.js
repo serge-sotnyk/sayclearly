@@ -104,11 +104,6 @@ function buildConfigRequest(config, settings, apiKeyValue) {
             model: nextConfig.gemini.model,
             api_key: trimmedApiKey === '' ? null : trimmedApiKey,
         },
-        langfuse: {
-            host: nextConfig.langfuse.host,
-            public_key: null,
-            secret_key: null,
-        },
     };
 }
 async function requestJson(fetchImpl, url, options) {

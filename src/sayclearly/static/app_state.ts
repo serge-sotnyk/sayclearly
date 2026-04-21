@@ -45,17 +45,36 @@ export interface SettingsFormState {
 }
 
 export interface GeneratedExercise {
-  text_language: string;
+  language: string;
   analysis_language: string;
   topic_prompt: string;
   text: string;
 }
 
 interface GenerateRequest {
-  text_language: string;
+  language: string;
   analysis_language: string;
   topic_prompt: string;
   reuse_last_topic: boolean;
+}
+
+interface ConfigUpdatePayload {
+  text_language: string;
+  analysis_language: string;
+  same_language_for_analysis: boolean;
+  ui_language: string;
+  last_topic_prompt: string;
+  session_limit: number;
+  keep_last_audio: boolean;
+  gemini: {
+    model: string;
+    api_key: string | null;
+  };
+  langfuse: {
+    host: string | null;
+    public_key: string | null;
+    secret_key: string | null;
+  };
 }
 
 export interface AppModel {
@@ -133,7 +152,7 @@ export function buildGenerateRequest(settings: SettingsFormState): GenerateReque
   const syncedSettings = syncAnalysisLanguage(settings);
 
   return {
-    text_language: syncedSettings.text_language,
+    language: syncedSettings.text_language,
     analysis_language: syncedSettings.analysis_language,
     topic_prompt: syncedSettings.topic_prompt,
     reuse_last_topic: syncedSettings.reuse_last_topic,
@@ -143,7 +162,7 @@ export function buildGenerateRequest(settings: SettingsFormState): GenerateReque
 export function buildConfigUpdatePayload(
   config: PublicConfig,
   settings: SettingsFormState,
-): PublicConfig {
+): ConfigUpdatePayload {
   const syncedSettings = syncAnalysisLanguage(settings);
   const lastTopicPrompt =
     syncedSettings.reuse_last_topic && syncedSettings.topic_prompt === ''
@@ -151,11 +170,22 @@ export function buildConfigUpdatePayload(
       : syncedSettings.topic_prompt;
 
   return {
-    ...config,
     text_language: syncedSettings.text_language,
     analysis_language: syncedSettings.analysis_language,
     same_language_for_analysis: syncedSettings.same_language_for_analysis,
+    ui_language: config.ui_language,
     last_topic_prompt: lastTopicPrompt,
+    session_limit: config.session_limit,
+    keep_last_audio: config.keep_last_audio,
+    gemini: {
+      model: config.gemini.model,
+      api_key: null,
+    },
+    langfuse: {
+      host: config.langfuse.host,
+      public_key: null,
+      secret_key: null,
+    },
   };
 }
 
