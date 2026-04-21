@@ -11,14 +11,10 @@ class ExerciseService:
     def __init__(self, data_root: Path | None = None) -> None:
         self.data_root = data_root
 
-    def generate_text(
-        self, request: ExerciseGenerationRequest
-    ) -> ExerciseGenerationResponse:
+    def generate_text(self, request: ExerciseGenerationRequest) -> ExerciseGenerationResponse:
         topic_prompt = self._resolve_topic(request)
         topic_clause = (
-            f" about {topic_prompt}"
-            if topic_prompt
-            else " for a general speaking warmup"
+            f" about {topic_prompt}" if topic_prompt else " for a general speaking warmup"
         )
         text = " ".join(
             [

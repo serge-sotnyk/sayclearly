@@ -41,9 +41,9 @@ class ExerciseRoute(APIRoute):
                 return await original_route_handler(request)
             except RequestValidationError as exc:
                 errors = exc.errors()
-                status_code = 400 if all(
-                    _is_bad_request_validation_error(error) for error in errors
-                ) else 422
+                status_code = (
+                    400 if all(_is_bad_request_validation_error(error) for error in errors) else 422
+                )
                 return JSONResponse(
                     status_code=status_code,
                     content={"detail": jsonable_encoder(errors)},
