@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmitOnError": true,
+    "rootDir": "src/sayclearly/static",
+    "outDir": "src/sayclearly/static/dist",
+    "skipLibCheck": true
+  },
+  "include": ["src/sayclearly/static/**/*.ts"],
+  "exclude": ["src/sayclearly/static/dist", "node_modules"]
+}

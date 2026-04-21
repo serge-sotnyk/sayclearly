@@ -1,0 +1,12 @@
+{
+  "name": "sayclearly-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:frontend": "tsc --project tsconfig.json",
+    "test:frontend": "npm run build:frontend && node --test frontend-tests/*.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
