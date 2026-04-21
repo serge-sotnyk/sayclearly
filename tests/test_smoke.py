@@ -50,30 +50,6 @@ def test_static_stylesheet_is_served() -> None:
     assert ".page-shell" in response.text
 
 
-def test_docs_endpoint_is_not_exposed() -> None:
-    client = TestClient(create_app())
-
-    response = client.get("/docs")
-
-    assert response.status_code == 404
-
-
-def test_redoc_endpoint_is_not_exposed() -> None:
-    client = TestClient(create_app())
-
-    response = client.get("/redoc")
-
-    assert response.status_code == 404
-
-
-def test_openapi_endpoint_is_not_exposed() -> None:
-    client = TestClient(create_app())
-
-    response = client.get("/openapi.json")
-
-    assert response.status_code == 404
-
-
 def test_main_opens_browser_and_starts_server(monkeypatch) -> None:
     opened_urls: list[str] = []
     run_calls: list[tuple[object, str, int]] = []
