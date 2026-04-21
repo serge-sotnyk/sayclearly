@@ -282,6 +282,36 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
   assert.match(shell.elements.get('[data-exercise-text]').textContent, /appear here/i);
 });
 
+test('startApp clears reuse intent when the user types a fresh topic before generating', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise({ topic_prompt: 'Fresh topic' });
+  const { fetchStub, calls } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+  );
+
+  await startApp(shell.document, fetchStub);
+
+  shell.elements.get('[data-topic-input]').value = '';
+  await shell.elements.get('[data-reuse-topic-button]').click();
+  assert.match(shell.elements.get('[data-status-message]').textContent, /reuse/i);
+
+  shell.elements.get('[data-topic-input]').value = 'Fresh topic';
+  await shell.elements.get('[data-topic-input]').input();
+  assert.equal(shell.elements.get('[data-status-message]').textContent, 'Ready to generate a guided exercise.');
+
+  await shell.elements.get('[data-generate-button]').click();
+
+  assert.deepEqual(JSON.parse(calls[2].options.body), {
+    text_language: 'uk',
+    analysis_language: 'uk',
+    topic_prompt: 'Fresh topic',
+    reuse_last_topic: false,
+  });
+});
+
 test('startApp clears stored API keys and refreshes the rendered status', async () => {
   const shell = createShell();
   const loadedConfig = createConfig();

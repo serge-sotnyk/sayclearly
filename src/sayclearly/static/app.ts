@@ -285,6 +285,9 @@ export async function startApp(
   });
 
   elements.topicInput.addEventListener('input', () => {
+    if (elements.topicInput.value.trim() !== '') {
+      reuseNextGeneration = false;
+    }
     refreshFromInputs();
   });
 

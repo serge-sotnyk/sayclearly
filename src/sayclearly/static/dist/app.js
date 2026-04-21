@@ -192,6 +192,9 @@ export async function startApp(documentRef = document, fetchImpl = fetch) {
         refreshFromInputs();
     });
     elements.topicInput.addEventListener('input', () => {
+        if (elements.topicInput.value.trim() !== '') {
+            reuseNextGeneration = false;
+        }
         refreshFromInputs();
     });
     elements.reuseTopicButton.addEventListener('click', () => {
