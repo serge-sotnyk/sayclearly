@@ -7,7 +7,6 @@ from fastapi.responses import JSONResponse
 
 BAD_REQUEST_VALIDATION_ROUTES = {
     ("POST", "/api/config"),
-    ("POST", "/api/generate-text"),
     ("POST", "/api/history"),
 }
 BAD_REQUEST_VALIDATION_TYPES = {

@@ -1,8 +1,10 @@
 from pathlib import Path
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from sayclearly.app import create_app
+from sayclearly.exercise.api import build_exercise_router
 from sayclearly.storage.files import load_config, save_config
 
 
@@ -51,6 +53,21 @@ def test_post_generate_text_can_reuse_last_topic_from_config(tmp_path: Path) -> 
 
 def test_post_generate_text_returns_400_for_invalid_payload_shape(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
+
+    response = client.post(
+        "/api/generate-text",
+        json={"text_language": "en", "unexpected": "field"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_exercise_router_returns_400_for_invalid_payload_shape_without_global_handler(
+    tmp_path: Path,
+) -> None:
+    app = FastAPI()
+    app.include_router(build_exercise_router(tmp_path))
+    client = TestClient(app)
 
     response = client.post(
         "/api/generate-text",
