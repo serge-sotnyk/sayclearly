@@ -96,7 +96,7 @@ function buildSettingsFromConfig(config: PublicConfig): SettingsFormState {
     analysis_language: config.analysis_language,
     same_language_for_analysis: config.same_language_for_analysis,
     topic_prompt: config.last_topic_prompt,
-    reuse_last_topic: config.last_topic_prompt.length > 0,
+    reuse_last_topic: false,
   });
 }
 
@@ -145,13 +145,17 @@ export function buildConfigUpdatePayload(
   settings: SettingsFormState,
 ): PublicConfig {
   const syncedSettings = syncAnalysisLanguage(settings);
+  const lastTopicPrompt =
+    syncedSettings.reuse_last_topic && syncedSettings.topic_prompt === ''
+      ? config.last_topic_prompt
+      : syncedSettings.topic_prompt;
 
   return {
     ...config,
     text_language: syncedSettings.text_language,
     analysis_language: syncedSettings.analysis_language,
     same_language_for_analysis: syncedSettings.same_language_for_analysis,
-    last_topic_prompt: syncedSettings.topic_prompt,
+    last_topic_prompt: lastTopicPrompt,
   };
 }
 

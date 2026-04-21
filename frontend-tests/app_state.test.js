@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  applyLoadedConfig,
   applyGeneratedExercise,
   applyGenerationError,
   advanceExerciseStep,
@@ -90,6 +91,14 @@ test('applyGenerationError moves flow into error', () => {
   assert.equal(updatedModel.error_message, 'Generation failed');
 });
 
+test('applyLoadedConfig keeps reuse_last_topic as explicit user intent on load', () => {
+  const model = createInitialAppModel();
+  const loadedModel = applyLoadedConfig(model, publicConfig);
+
+  assert.equal(loadedModel.settings.topic_prompt, 'Keep the original config topic');
+  assert.equal(loadedModel.settings.reuse_last_topic, false);
+});
+
 test('buildGenerateRequest and buildConfigUpdatePayload preserve current config values outside stage 3 form', () => {
   const settings = {
     text_language: 'pl',
@@ -112,5 +121,23 @@ test('buildGenerateRequest and buildConfigUpdatePayload preserve current config 
     analysis_language: 'pl',
     same_language_for_analysis: true,
     last_topic_prompt: 'Describe a quiet library',
+  });
+});
+
+test('buildConfigUpdatePayload preserves stored last_topic_prompt when reusing a blank input', () => {
+  const settings = {
+    text_language: 'pl',
+    analysis_language: 'en',
+    same_language_for_analysis: false,
+    topic_prompt: '',
+    reuse_last_topic: true,
+  };
+
+  assert.deepEqual(buildConfigUpdatePayload(publicConfig, settings), {
+    ...publicConfig,
+    text_language: 'pl',
+    analysis_language: 'en',
+    same_language_for_analysis: false,
+    last_topic_prompt: 'Keep the original config topic',
   });
 });
