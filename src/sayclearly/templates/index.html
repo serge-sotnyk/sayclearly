@@ -7,15 +7,92 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}" />
   </head>
   <body>
-    <main class="page-shell">
-      <p class="eyebrow">Local-only MVP</p>
-      <h1>SayClearly</h1>
-      <p class="lead">
-        A calm local diction practice tool with a web UI and Gemini-based feedback.
-      </p>
-      <p class="hint">
-        Stage 1 provides the runtime shell. Exercise setup, recording, and analysis arrive in later stages.
-      </p>
+    <main class="page-shell" data-app-root>
+      <section class="hero-panel panel">
+        <p class="eyebrow">Guided exercise flow</p>
+        <h1>SayClearly</h1>
+        <p class="lead">
+          Prepare a topic, move through each speaking step, and keep the session setup close at hand.
+        </p>
+      </section>
+
+      <section class="status-banner panel" aria-live="polite">
+        <p class="status-label">Session status</p>
+        <p class="status-text">Ready to generate a guided exercise.</p>
+      </section>
+
+      <div class="shell-grid">
+        <section class="panel screen-panel" data-screen="setup" aria-labelledby="setup-title">
+          <div class="panel-heading">
+            <p class="section-kicker">Setup</p>
+            <h2 id="setup-title">Prepare the prompt</h2>
+          </div>
+
+          <form class="setup-form">
+            <label class="field">
+              <span>Gemini API key</span>
+              <input type="password" name="api-key" autocomplete="off" placeholder="Paste your local API key" />
+            </label>
+
+            <label class="field">
+              <span>Text language</span>
+              <input type="text" name="text-language" value="English" />
+            </label>
+
+            <label class="field">
+              <span>Analysis language</span>
+              <input type="text" name="analysis-language" value="English" />
+            </label>
+
+            <label class="toggle-field">
+              <input type="checkbox" name="same-language" checked />
+              <span>Use the same language for text and analysis</span>
+            </label>
+
+            <label class="field field-topic">
+              <span>Topic</span>
+              <input type="text" name="topic" placeholder="Ordering coffee before work" />
+            </label>
+
+            <div class="button-row">
+              <button type="button" class="button button-secondary">Reuse topic</button>
+              <button type="button" class="button button-primary">Generate</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel screen-panel" data-screen="exercise" aria-labelledby="exercise-title">
+          <div class="panel-heading">
+            <p class="step-label">Step 1 of 3</p>
+            <h2 id="exercise-title">Warm-up response</h2>
+            <p class="step-instruction">Read the prompt out loud once, then repeat it with a slower and clearer pace.</p>
+          </div>
+
+          <div class="exercise-text" aria-live="polite">
+            Your generated exercise text will appear here when the frontend bundle is connected.
+          </div>
+
+          <div class="button-row">
+            <button type="button" class="button button-secondary">Reset</button>
+            <button type="button" class="button button-primary">Next step</button>
+          </div>
+        </section>
+
+        <aside class="panel settings-panel" data-settings-panel aria-labelledby="settings-title">
+          <div class="panel-heading">
+            <p class="section-kicker">Settings</p>
+            <h2 id="settings-title">Local key storage</h2>
+          </div>
+
+          <p class="settings-status">API key status: not checked yet.</p>
+
+          <div class="settings-actions">
+            <button type="button" class="button button-secondary">Clear stored API key</button>
+            <button type="button" class="button button-ghost">Close settings</button>
+          </div>
+        </aside>
+      </div>
     </main>
+    <script type="module" src="{{ url_for('static', path='/dist/app.js') }}"></script>
   </body>
 </html>
