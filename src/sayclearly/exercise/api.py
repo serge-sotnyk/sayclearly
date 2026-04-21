@@ -23,7 +23,13 @@ BAD_REQUEST_VALIDATION_TYPES = {
 
 
 def _is_bad_request_validation_error(error: dict[str, Any]) -> bool:
-    return error.get("type") in BAD_REQUEST_VALIDATION_TYPES
+    location = error.get("loc")
+    return (
+        isinstance(location, tuple)
+        and bool(location)
+        and location[0] == "body"
+        and error.get("type") in BAD_REQUEST_VALIDATION_TYPES
+    )
 
 
 class ExerciseRoute(APIRoute):

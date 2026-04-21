@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 from sayclearly.app import create_app
-from sayclearly.exercise.api import build_exercise_router
+from sayclearly.exercise.api import ExerciseRoute, build_exercise_router
 from sayclearly.storage.files import load_config, save_config
 
 
@@ -96,3 +96,20 @@ def test_post_generate_text_returns_fastapi_style_error_for_malformed_json(
     assert isinstance(response.json()["detail"], list)
     assert response.json()["detail"][0]["type"] == "json_invalid"
     assert response.json()["detail"][0]["loc"][0] == "body"
+
+
+def test_exercise_route_keeps_non_body_validation_errors_as_422() -> None:
+    router = APIRouter(route_class=ExerciseRoute)
+
+    @router.get("/query-check")
+    def query_check(limit: int) -> dict[str, int]:
+        return {"limit": limit}
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+
+    response = client.get("/query-check")
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"][0] == "query"
