@@ -205,7 +205,9 @@ def test_get_public_config_hides_secrets_and_reports_effective_sources(
     }
 
 
-def test_get_public_config_uses_env_defaults_when_storage_is_missing(tmp_path: Path, monkeypatch) -> None:
+def test_get_public_config_uses_env_defaults_when_storage_is_missing(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite-preview")
 
     public = ConfigService(tmp_path).get_public_config()

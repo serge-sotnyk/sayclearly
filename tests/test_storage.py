@@ -42,7 +42,9 @@ def test_load_config_creates_default_storage_tree(tmp_path: Path, monkeypatch) -
     assert load_history(tmp_path).version == 1
 
 
-def test_load_config_uses_environment_model_defaults_for_new_storage(tmp_path: Path, monkeypatch) -> None:
+def test_load_config_uses_environment_model_defaults_for_new_storage(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite-preview")
 
     config = load_config(tmp_path)

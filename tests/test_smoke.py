@@ -121,9 +121,7 @@ def test_main_registers_browser_open_on_app_startup(monkeypatch) -> None:
     assert startup_handler_counts == [1]
 
 
-def test_main_does_not_load_parent_dotenv_when_cwd_has_no_env(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_main_does_not_load_parent_dotenv_when_cwd_has_no_env(monkeypatch, tmp_path: Path) -> None:
     parent_dir = tmp_path / "parent"
     cwd_dir = parent_dir / "cwd"
     parent_dir.mkdir()
