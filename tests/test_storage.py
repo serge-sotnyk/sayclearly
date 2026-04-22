@@ -18,10 +18,14 @@ from sayclearly.storage.models import HistoryStore, StoredSecrets
 def test_load_config_creates_default_storage_tree(tmp_path: Path) -> None:
     config = load_config(tmp_path)
 
-    assert config.version == 1
+    assert config.version == 2
     assert config.text_language == "uk"
+    assert config.gemini.text_model == "gemini-3-flash"
+    assert config.gemini.analysis_model == "gemini-3-flash"
+    assert config.gemini.same_model_for_analysis is True
+    assert config.gemini.text_thinking_level == "high"
     assert (tmp_path / "cache").is_dir()
-    assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["version"] == 1
+    assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["version"] == 2
     assert json.loads((tmp_path / "secrets.json").read_text(encoding="utf-8")) == {
         "version": 1,
         "gemini": {},
@@ -33,6 +37,61 @@ def test_load_config_creates_default_storage_tree(tmp_path: Path) -> None:
     }
     assert load_secrets(tmp_path).version == 1
     assert load_history(tmp_path).version == 1
+
+
+def test_load_config_uses_environment_model_defaults_for_new_storage(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite-preview")
+
+    config = load_config(tmp_path)
+
+    assert config.gemini.text_model == "gemini-3.1-flash-lite-preview"
+    assert config.gemini.analysis_model == "gemini-3.1-flash-lite-preview"
+
+
+def test_load_config_migrates_version_1_gemini_model_to_version_2_schema(tmp_path: Path) -> None:
+    load_config(tmp_path)
+    (tmp_path / "config.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "text_language": "en",
+                "analysis_language": "uk",
+                "ui_language": "en",
+                "same_language_for_analysis": False,
+                "last_topic_prompt": "legacy prompt",
+                "session_limit": 222,
+                "keep_last_audio": True,
+                "gemini": {"model": "gemini-2.5-flash"},
+                "langfuse": {"host": "https://langfuse.example"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(tmp_path)
+
+    assert config.version == 2
+    assert config.gemini.text_model == "gemini-2.5-flash"
+    assert config.gemini.analysis_model == "gemini-2.5-flash"
+    assert config.gemini.same_model_for_analysis is True
+    assert config.gemini.text_thinking_level == "high"
+    assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8")) == {
+        "version": 2,
+        "text_language": "en",
+        "analysis_language": "uk",
+        "ui_language": "en",
+        "same_language_for_analysis": False,
+        "last_topic_prompt": "legacy prompt",
+        "session_limit": 222,
+        "keep_last_audio": True,
+        "gemini": {
+            "text_model": "gemini-2.5-flash",
+            "analysis_model": "gemini-2.5-flash",
+            "same_model_for_analysis": True,
+            "text_thinking_level": "high",
+        },
+        "langfuse": {"host": "https://langfuse.example"},
+    }
 
 
 def test_save_config_replaces_the_previous_document(tmp_path: Path) -> None:

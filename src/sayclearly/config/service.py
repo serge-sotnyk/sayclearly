@@ -9,6 +9,7 @@ from sayclearly.config.models import (
     LangfusePublicConfig,
     PublicConfigView,
 )
+from sayclearly.gemini.catalog import get_supported_gemini_models
 from sayclearly.storage.files import load_config, load_secrets, save_config, save_secrets
 
 
@@ -47,9 +48,13 @@ class ConfigService:
             session_limit=stored_config.session_limit,
             keep_last_audio=stored_config.keep_last_audio,
             gemini=GeminiPublicConfig(
-                model=stored_config.gemini.model,
+                text_model=stored_config.gemini.text_model,
+                analysis_model=stored_config.gemini.analysis_model,
+                same_model_for_analysis=stored_config.gemini.same_model_for_analysis,
+                text_thinking_level=stored_config.gemini.text_thinking_level,
                 has_api_key=bool(gemini_api_key),
                 api_key_source=gemini_source,
+                available_models=get_supported_gemini_models(),
             ),
             langfuse=LangfusePublicConfig(
                 host=langfuse_host,
@@ -73,7 +78,10 @@ class ConfigService:
         stored_config.last_topic_prompt = payload.last_topic_prompt
         stored_config.session_limit = payload.session_limit
         stored_config.keep_last_audio = payload.keep_last_audio
-        stored_config.gemini.model = payload.gemini.model
+        stored_config.gemini.text_model = payload.gemini.text_model
+        stored_config.gemini.analysis_model = payload.gemini.analysis_model
+        stored_config.gemini.same_model_for_analysis = payload.gemini.same_model_for_analysis
+        stored_config.gemini.text_thinking_level = payload.gemini.text_thinking_level
         stored_config.langfuse.host = payload.langfuse.host
 
         if payload.gemini.api_key is not None:

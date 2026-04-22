@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pathlib import Path
 
 import sayclearly.main as main_module
 from sayclearly.app import create_app
@@ -116,3 +117,31 @@ def test_main_registers_browser_open_on_app_startup(monkeypatch) -> None:
 
     assert opened_urls == []
     assert startup_handler_counts == [1]
+
+
+def test_main_loads_project_dotenv_before_creating_app(monkeypatch) -> None:
+    calls: list[tuple[str, object]] = []
+
+    def fake_load_dotenv(*, dotenv_path: Path, override: bool) -> bool:
+        calls.append(("load_dotenv", dotenv_path, override))
+        return True
+
+    def fake_create_app() -> FastAPI:
+        calls.append(("create_app",))
+        return FastAPI()
+
+    def fake_run(app: object, host: str, port: int) -> None:
+        calls.append(("run", host, port))
+
+    monkeypatch.setattr(main_module, "load_dotenv", fake_load_dotenv)
+    monkeypatch.setattr(main_module, "create_app", fake_create_app)
+    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
+
+    main_module.main()
+
+    assert calls[0] == (
+        "load_dotenv",
+        main_module.PROJECT_ROOT / ".env",
+        False,
+    )
+    assert calls[1] == ("create_app",)

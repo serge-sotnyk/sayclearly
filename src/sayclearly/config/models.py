@@ -2,6 +2,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from sayclearly.gemini.catalog import ThinkingLevel
+
 ConfigSource = Literal["env", "stored", "none"]
 NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -9,7 +11,10 @@ NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_len
 class GeminiConfigUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    model: NonEmptyString
+    text_model: NonEmptyString
+    analysis_model: NonEmptyString
+    same_model_for_analysis: bool
+    text_thinking_level: ThinkingLevel
     api_key: NonEmptyString | None = None
 
 
@@ -38,9 +43,13 @@ class ConfigUpdatePayload(BaseModel):
 class GeminiPublicConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    model: str
+    text_model: str
+    analysis_model: str
+    same_model_for_analysis: bool
+    text_thinking_level: ThinkingLevel
     has_api_key: bool
     api_key_source: ConfigSource
+    available_models: list[dict[str, str | int | None]]
 
 
 class LangfusePublicConfig(BaseModel):
