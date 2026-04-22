@@ -1,13 +1,22 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from sayclearly.app import create_app
+from sayclearly.gemini.client import GeneratedExercise
 
 
 def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        "sayclearly.exercise.service.GeminiClient.generate_exercise",
+        lambda self, *, prompt, model, thinking_level: GeneratedExercise(
+            text="Order your coffee clearly, then thank the barista with a calm and steady voice."
+        ),
+    )
     client = TestClient(create_app(tmp_path))
 
     config_response = client.get("/api/config")
@@ -26,8 +35,11 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
             "session_limit": config["session_limit"],
             "keep_last_audio": config["keep_last_audio"],
             "gemini": {
-                "model": config["gemini"]["model"],
-                "api_key": None,
+                "text_model": config["gemini"]["text_model"],
+                "analysis_model": config["gemini"]["analysis_model"],
+                "same_model_for_analysis": config["gemini"]["same_model_for_analysis"],
+                "text_thinking_level": config["gemini"]["text_thinking_level"],
+                "api_key": "stored-key",
             },
             "langfuse": {
                 "host": config["langfuse"]["host"],

@@ -11,7 +11,11 @@ from sayclearly.exercise.models import (
     ExerciseGenerationRequest,
     ExerciseGenerationResponse,
 )
-from sayclearly.exercise.service import ExerciseService
+from sayclearly.exercise.service import (
+    ExerciseGenerationProviderError,
+    ExerciseService,
+    ExerciseServiceConfigurationError,
+)
 from sayclearly.storage.files import StorageError
 
 BAD_REQUEST_VALIDATION_TYPES = {
@@ -60,6 +64,13 @@ def build_exercise_router(data_root: Path | None = None) -> APIRouter:
     def generate_text(payload: ExerciseGenerationRequest) -> ExerciseGenerationResponse:
         try:
             return service.generate_text(payload)
+        except ExerciseServiceConfigurationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except ExerciseGenerationProviderError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Text generation is unavailable right now. Please try again.",
+            ) from exc
         except StorageError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
