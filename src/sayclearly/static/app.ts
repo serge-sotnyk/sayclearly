@@ -332,6 +332,10 @@ async function requestJson<T>(
   return (await response.json()) as T;
 }
 
+function getRequestErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof RequestError && error.detail !== null ? error.detail : fallback;
+}
+
 function render(
   documentRef: Document,
   elements: ShellElements,
@@ -686,10 +690,13 @@ export async function startApp(
           configForSave = await requestJson<PublicConfig>(fetchImpl, '/api/config', {
             method: 'GET',
           });
-          model = applyLoadedConfig(model, configForSave);
+          model = {
+            ...applyLoadedConfig(model, configForSave),
+            settings,
+          };
           hasLoadedConfig = true;
-        } catch {
-          throw new RequestError('Request failed: /api/config', LOAD_ERROR_STATUS);
+        } catch (error) {
+          throw new RequestError('Request failed: /api/config', getRequestErrorMessage(error, LOAD_ERROR_STATUS));
         }
       }
 
@@ -703,6 +710,7 @@ export async function startApp(
       model = {
         ...model,
         config: savedConfig,
+        settings,
       };
 
       const exercise = await requestJson<GeneratedExercise>(fetchImpl, '/api/generate-text', {
@@ -715,9 +723,7 @@ export async function startApp(
       reuseNextGeneration = false;
       model = applyGenerationError(
         model,
-        error instanceof RequestError && error.detail !== null
-          ? error.detail
-          : GENERATE_ERROR_STATUS,
+        getRequestErrorMessage(error, GENERATE_ERROR_STATUS),
       );
     }
 
@@ -740,8 +746,8 @@ export async function startApp(
       ...model,
       error_message: null,
     };
-  } catch {
-    model = applyGenerationError(model, LOAD_ERROR_STATUS);
+  } catch (error) {
+    model = applyGenerationError(model, getRequestErrorMessage(error, LOAD_ERROR_STATUS));
     model = {
       ...model,
       flow: 'home',

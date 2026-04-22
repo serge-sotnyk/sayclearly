@@ -197,6 +197,9 @@ async function requestJson(fetchImpl, url, options) {
     }
     return (await response.json());
 }
+function getRequestErrorMessage(error, fallback) {
+    return error instanceof RequestError && error.detail !== null ? error.detail : fallback;
+}
 function render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl) {
     renderModelOptions(documentRef, elements.textModelSelect, model.config.gemini.available_models);
     renderModelOptions(documentRef, elements.analysisModelSelect, model.config.gemini.available_models);
@@ -503,11 +506,14 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                     configForSave = await requestJson(fetchImpl, '/api/config', {
                         method: 'GET',
                     });
-                    model = applyLoadedConfig(model, configForSave);
+                    model = {
+                        ...applyLoadedConfig(model, configForSave),
+                        settings,
+                    };
                     hasLoadedConfig = true;
                 }
-                catch {
-                    throw new RequestError('Request failed: /api/config', LOAD_ERROR_STATUS);
+                catch (error) {
+                    throw new RequestError('Request failed: /api/config', getRequestErrorMessage(error, LOAD_ERROR_STATUS));
                 }
             }
             const savedConfig = await requestJson(fetchImpl, '/api/config', {
@@ -518,6 +524,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             model = {
                 ...model,
                 config: savedConfig,
+                settings,
             };
             const exercise = await requestJson(fetchImpl, '/api/generate-text', {
                 method: 'POST',
@@ -528,9 +535,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
         }
         catch (error) {
             reuseNextGeneration = false;
-            model = applyGenerationError(model, error instanceof RequestError && error.detail !== null
-                ? error.detail
-                : GENERATE_ERROR_STATUS);
+            model = applyGenerationError(model, getRequestErrorMessage(error, GENERATE_ERROR_STATUS));
         }
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
@@ -550,8 +555,8 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             error_message: null,
         };
     }
-    catch {
-        model = applyGenerationError(model, LOAD_ERROR_STATUS);
+    catch (error) {
+        model = applyGenerationError(model, getRequestErrorMessage(error, LOAD_ERROR_STATUS));
         model = {
             ...model,
             flow: 'home',

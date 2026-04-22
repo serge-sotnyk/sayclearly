@@ -589,6 +589,37 @@ test('startApp shows backend generation detail when the API returns a calm 400 m
   );
 });
 
+test('startApp shows backend config detail during startup and retry failures', async () => {
+  const startupShell = createShell();
+  const retryShell = createShell();
+  const storedConfig = createConfig();
+  const { fetchStub: startupFetch } = createFetchStub(
+    createResponse({ detail: 'Saved settings could not be read because the local config file is invalid.' }, false, 500),
+  );
+  const { fetchStub: retryFetch } = createFetchStub(
+    new Error('initial load failed'),
+    createResponse({ detail: 'Saved settings could not be reloaded before saving. Fix the config file and try again.' }, false, 500),
+  );
+
+  await startApp(startupShell.document, startupFetch);
+  assert.equal(
+    startupShell.elements.get('[data-status-message]').textContent,
+    'Saved settings could not be read because the local config file is invalid.',
+  );
+
+  await startApp(retryShell.document, retryFetch);
+  retryShell.elements.get('[data-topic-input]').value = 'Fresh topic';
+  await retryShell.elements.get('[data-topic-input]').input();
+  await retryShell.elements.get('[data-generate-button]').click();
+
+  assert.equal(
+    retryShell.elements.get('[data-status-message]').textContent,
+    'Saved settings could not be reloaded before saving. Fix the config file and try again.',
+  );
+  assert.equal(retryShell.elements.get('[data-topic-input]').value, 'Fresh topic');
+  assert.equal(retryShell.elements.get('[data-text-model-select]').value, storedConfig.gemini.text_model);
+});
+
 test('startApp keeps manual model choices available when config loading fails', async () => {
   const shell = createShell();
 
@@ -662,6 +693,52 @@ test('startApp reloads persisted config before saving after the initial config l
     },
   });
   assert.equal(shell.elements.get('[data-exercise-text]').textContent, exercise.text);
+});
+
+test('startApp preserves entered settings when generate fails after reload-and-save recovery', async () => {
+  const shell = createShell();
+  const storedConfig = createConfig({
+    last_topic_prompt: 'Stored topic',
+    gemini: {
+      ...createConfig().gemini,
+      text_model: 'gemini-3-flash-preview',
+      analysis_model: 'gemini-3-flash-preview',
+      same_model_for_analysis: true,
+      text_thinking_level: 'medium',
+    },
+  });
+  const savedConfig = createConfig({
+    last_topic_prompt: 'Fresh topic',
+    gemini: {
+      ...storedConfig.gemini,
+      text_model: 'gemini-2.5-flash',
+      analysis_model: 'gemini-2.5-flash',
+      same_model_for_analysis: true,
+      text_thinking_level: 'high',
+    },
+  });
+  const { fetchStub } = createFetchStub(
+    new Error('initial load failed'),
+    createResponse(storedConfig),
+    createResponse(savedConfig),
+    createResponse({ detail: 'Gemini text generation is temporarily unavailable.' }, false, 502),
+  );
+
+  await startApp(shell.document, fetchStub);
+
+  shell.elements.get('[data-topic-input]').value = 'Fresh topic';
+  await shell.elements.get('[data-topic-input]').input();
+  shell.elements.get('[data-text-model-select]').value = 'gemini-2.5-flash';
+  await shell.elements.get('[data-text-model-select]').change();
+  shell.elements.get('[data-thinking-level-select]').value = 'high';
+  await shell.elements.get('[data-thinking-level-select]').change();
+  await shell.elements.get('[data-generate-button]').click();
+
+  assert.equal(shell.elements.get('[data-status-message]').textContent, 'Gemini text generation is temporarily unavailable.');
+  assert.equal(shell.elements.get('[data-topic-input]').value, 'Fresh topic');
+  assert.equal(shell.elements.get('[data-text-model-select]').value, 'gemini-2.5-flash');
+  assert.equal(shell.elements.get('[data-analysis-model-select]').value, 'gemini-2.5-flash');
+  assert.equal(shell.elements.get('[data-thinking-level-select]').value, 'high');
 });
 
 test('startApp records, uploads, renders review, and clears review on record again', async () => {
