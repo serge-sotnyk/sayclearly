@@ -142,7 +142,10 @@ def test_generate_exercise_succeeds_when_telemetry_update_fails(monkeypatch) -> 
 
 def test_analyze_audio_parses_structured_json_and_uses_model_config() -> None:
     sdk_client = FakeSdkClient(
-        FakeResponse(None, text='{"clarity_score":72,"pace_score":65,"hesitations":[],"summary":["Good"],"recommendations":["Practice"]}')
+        FakeResponse(
+            None,
+            text='{"clarity_score":72,"pace_score":65,"hesitations":[],"summary":["Good"],"recommendations":["Practice"]}',
+        )
     )
     client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
 
@@ -167,7 +170,15 @@ def test_analyze_audio_parses_structured_json_and_uses_model_config() -> None:
 
 def test_analyze_audio_uses_thinking_level_for_default_gemini_3_models() -> None:
     sdk_client = FakeSdkClient(
-        FakeResponse({"clarity_score": 80, "pace_score": 70, "hesitations": [], "summary": [], "recommendations": []})
+        FakeResponse(
+            {
+                "clarity_score": 80,
+                "pace_score": 70,
+                "hesitations": [],
+                "summary": [],
+                "recommendations": [],
+            }
+        )
     )
     client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
 
@@ -185,7 +196,17 @@ def test_analyze_audio_uses_thinking_level_for_default_gemini_3_models() -> None
 
 
 def test_analyze_audio_rejects_malformed_response() -> None:
-    sdk_client = FakeSdkClient(FakeResponse({"clarity_score": -1, "pace_score": 50, "hesitations": [], "summary": [], "recommendations": []}))
+    sdk_client = FakeSdkClient(
+        FakeResponse(
+            {
+                "clarity_score": -1,
+                "pace_score": 50,
+                "hesitations": [],
+                "summary": [],
+                "recommendations": [],
+            }
+        )
+    )
     client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
 
     with pytest.raises(GeminiMalformedResponseError):

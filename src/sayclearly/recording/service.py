@@ -110,9 +110,7 @@ class RecordingService:
                 "Gemini API key was rejected. Update it and try again."
             ) from exc
         except GeminiMalformedResponseError as exc:
-            raise RecordingAnalysisProviderError(
-                "Analysis did not complete. Try again."
-            ) from exc
+            raise RecordingAnalysisProviderError("Analysis did not complete. Try again.") from exc
         except Exception as exc:
             raise RecordingAnalysisProviderError(
                 "Analysis is unavailable right now. Please try again."
@@ -143,8 +141,8 @@ class RecordingService:
         hesitations = [
             (
                 f"{h['note']} (at {h['start']:.1f}s-{h['end']:.1f}s)"
-                if 'start' in h and 'end' in h
-                else h.get('note', '')
+                if "start" in h and "end" in h
+                else h.get("note", "")
             )
             for h in structured.hesitations
         ]

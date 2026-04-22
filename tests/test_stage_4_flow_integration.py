@@ -11,11 +11,12 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    exercise_text = (
+        "Order your coffee clearly, then thank the barista with a calm and steady voice."
+    )
     monkeypatch.setattr(
         "sayclearly.exercise.service.GeminiClient.generate_exercise",
-        lambda self, *, prompt, model, thinking_level: GeneratedExercise(
-            text="Order your coffee clearly, then thank the barista with a calm and steady voice."
-        ),
+        lambda self, *, prompt, model, thinking_level: GeneratedExercise(text=exercise_text),
     )
     client = TestClient(create_app(tmp_path))
 
@@ -66,7 +67,11 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
     analyze_response = client.post(
         "/api/analyze-recording",
         data={
-            "metadata": '{"language":"en","analysis_language":"uk","exercise_text":"Order your coffee clearly, then thank the barista with a calm and steady voice."}'
+            "metadata": (
+                f'{{"language":"en",'
+                f'"analysis_language":"uk",'
+                f'"exercise_text":"{exercise_text}"}}'
+            )
         },
         files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
     )
