@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from sayclearly.gemini.catalog import ThinkingLevel
 from sayclearly.gemini.telemetry import GeminiTelemetry
+from sayclearly.recording.models import StructuredAudioAnalysis
 
 _THINKING_BUDGETS: dict[ThinkingLevel, int] = {
     "low": 128,
@@ -115,6 +116,60 @@ class GeminiClient:
 
         trace.record_success(exercise.text)
         return exercise
+
+    def analyze_audio(
+        self,
+        *,
+        audio_bytes: bytes,
+        content_type: str,
+        prompt: str,
+        model: str,
+        thinking_level: ThinkingLevel,
+        system_instruction: str | None = None,
+    ) -> StructuredAudioAnalysis:
+        trace = self._telemetry.start_audio_analysis(
+            prompt=prompt,
+            model=model,
+            thinking_level=thinking_level,
+        )
+
+        try:
+            response = self._sdk_client.models.generate_content(
+                model=model,
+                contents=[
+                    types.Part.from_bytes(data=audio_bytes, mime_type=content_type),
+                    prompt,
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=1,
+                    response_mime_type="application/json",
+                    response_json_schema=StructuredAudioAnalysis.model_json_schema(),
+                    thinking_config=self._build_thinking_config(
+                        model=model,
+                        thinking_level=thinking_level,
+                    ),
+                ),
+            )
+        except Exception as exc:
+            trace.record_error(str(exc))
+            if _is_invalid_credentials_error(exc):
+                raise GeminiInvalidCredentialsError(
+                    "Gemini API key was rejected. Update it and try again."
+                ) from exc
+            raise GeminiProviderError("Gemini audio analysis request failed.") from exc
+
+        try:
+            if isinstance(response.text, str) and response.text.strip() != "":
+                analysis = StructuredAudioAnalysis.model_validate_json(response.text)
+            else:
+                analysis = StructuredAudioAnalysis.model_validate(response.parsed)
+        except Exception as exc:
+            trace.record_error(str(exc))
+            raise GeminiMalformedResponseError("Gemini returned malformed audio analysis.") from exc
+
+        trace.record_success(response.text or str(response.parsed))
+        return analysis
 
     def _build_thinking_config(
         self,

@@ -7,6 +7,7 @@ from sayclearly.gemini.client import (
     GeneratedExercise,
 )
 from sayclearly.gemini.telemetry import GeminiTelemetry
+from sayclearly.recording.models import StructuredAudioAnalysis
 
 
 class FakeModels:
@@ -137,3 +138,81 @@ def test_generate_exercise_succeeds_when_telemetry_update_fails(monkeypatch) -> 
     )
 
     assert exercise == GeneratedExercise(text="Speak clearly and stay relaxed.")
+
+
+def test_analyze_audio_parses_structured_json_and_uses_model_config() -> None:
+    sdk_client = FakeSdkClient(
+        FakeResponse(None, text='{"clarity_score":72,"pace_score":65,"hesitations":[],"summary":["Good"],"recommendations":["Practice"]}')
+    )
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
+
+    result = client.analyze_audio(
+        audio_bytes=b"fake audio",
+        content_type="audio/webm",
+        prompt="Analyze this recording.",
+        model="gemini-2.5-flash",
+        thinking_level="medium",
+        system_instruction="You are a coach.",
+    )
+
+    assert result.clarity_score == 72
+    assert result.pace_score == 65
+    call = sdk_client.models.calls[0]
+    assert call["model"] == "gemini-2.5-flash"
+    contents = call["contents"]
+    assert len(contents) == 2
+    assert call["config"].response_mime_type == "application/json"
+    assert call["config"].response_json_schema == StructuredAudioAnalysis.model_json_schema()
+
+
+def test_analyze_audio_uses_thinking_level_for_default_gemini_3_models() -> None:
+    sdk_client = FakeSdkClient(
+        FakeResponse({"clarity_score": 80, "pace_score": 70, "hesitations": [], "summary": [], "recommendations": []})
+    )
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
+
+    client.analyze_audio(
+        audio_bytes=b"fake audio",
+        content_type="audio/webm",
+        prompt="Analyze this recording.",
+        model="gemini-3-flash-preview",
+        thinking_level="high",
+    )
+
+    config = sdk_client.models.calls[0]["config"]
+    assert config.thinking_config.thinking_level == "HIGH"
+    assert config.thinking_config.thinking_budget is None
+
+
+def test_analyze_audio_rejects_malformed_response() -> None:
+    sdk_client = FakeSdkClient(FakeResponse({"clarity_score": -1, "pace_score": 50, "hesitations": [], "summary": [], "recommendations": []}))
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
+
+    with pytest.raises(GeminiMalformedResponseError):
+        client.analyze_audio(
+            audio_bytes=b"fake audio",
+            content_type="audio/webm",
+            prompt="Analyze this recording.",
+            model="gemini-2.5-flash",
+            thinking_level="low",
+        )
+
+
+def test_analyze_audio_classifies_invalid_api_key_errors() -> None:
+    class FakeApiError(Exception):
+        def __init__(self) -> None:
+            self.code = 401
+            self.message = "API key not valid. Please pass a valid API key."
+            super().__init__(self.message)
+
+    sdk_client = FakeSdkClient(FakeApiError())
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
+
+    with pytest.raises(GeminiInvalidCredentialsError, match="API key"):
+        client.analyze_audio(
+            audio_bytes=b"fake audio",
+            content_type="audio/webm",
+            prompt="Analyze this recording.",
+            model="gemini-2.5-flash",
+            thinking_level="low",
+        )

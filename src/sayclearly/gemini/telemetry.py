@@ -70,13 +70,42 @@ class GeminiTelemetry:
         model: str,
         thinking_level: ThinkingLevel,
     ) -> GeminiGenerationTrace:
+        return self._start_generation(
+            name="gemini.generate_exercise",
+            prompt=prompt,
+            model=model,
+            thinking_level=thinking_level,
+        )
+
+    def start_audio_analysis(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        thinking_level: ThinkingLevel,
+    ) -> GeminiGenerationTrace:
+        return self._start_generation(
+            name="gemini.analyze_audio",
+            prompt=prompt,
+            model=model,
+            thinking_level=thinking_level,
+        )
+
+    def _start_generation(
+        self,
+        *,
+        name: str,
+        prompt: str,
+        model: str,
+        thinking_level: ThinkingLevel,
+    ) -> GeminiGenerationTrace:
         langfuse_client = self._get_langfuse_client()
         if langfuse_client is None:
             return GeminiGenerationTrace()
 
         try:
             observation = langfuse_client.start_observation(
-                name="gemini.generate_exercise",
+                name=name,
                 as_type="generation",
                 input=prompt,
                 model=model,
