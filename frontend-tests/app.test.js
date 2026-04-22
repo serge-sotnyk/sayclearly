@@ -538,6 +538,49 @@ test('startApp clears stored API keys and refreshes the rendered status', async 
   assert.match(shell.elements.get('[data-settings-status]').textContent, /not stored/i);
 });
 
+test('startApp preserves in-progress settings when clearing the stored API key', async () => {
+  const shell = createShell();
+  const loadedConfig = createConfig();
+  const clearedConfig = createConfig({
+    gemini: {
+      ...loadedConfig.gemini,
+      has_api_key: false,
+      api_key_source: 'none',
+    },
+  });
+  const { fetchStub } = createFetchStub(createResponse(loadedConfig), createResponse(clearedConfig));
+
+  await startApp(shell.document, fetchStub);
+
+  shell.elements.get('[data-text-language-input]').value = 'pl';
+  await shell.elements.get('[data-text-language-input]').input();
+  shell.elements.get('[data-same-language-toggle]').checked = false;
+  await shell.elements.get('[data-same-language-toggle]').change();
+  shell.elements.get('[data-analysis-language-input]').value = 'de';
+  await shell.elements.get('[data-analysis-language-input]').input();
+  shell.elements.get('[data-text-model-select]').value = 'gemini-2.5-flash';
+  await shell.elements.get('[data-text-model-select]').change();
+  shell.elements.get('[data-same-model-toggle]').checked = true;
+  await shell.elements.get('[data-same-model-toggle]').change();
+  shell.elements.get('[data-thinking-level-select]').value = 'low';
+  await shell.elements.get('[data-thinking-level-select]').change();
+  shell.elements.get('[data-topic-input]').value = 'Fresh topic';
+  await shell.elements.get('[data-topic-input]').input();
+  shell.elements.get('[data-api-key-input]').value = 'unsaved-key';
+
+  await shell.elements.get('[data-clear-api-key-button]').click();
+
+  assert.equal(shell.elements.get('[data-text-language-input]').value, 'pl');
+  assert.equal(shell.elements.get('[data-analysis-language-input]').value, 'de');
+  assert.equal(shell.elements.get('[data-text-model-select]').value, 'gemini-2.5-flash');
+  assert.equal(shell.elements.get('[data-analysis-model-select]').value, 'gemini-2.5-flash');
+  assert.equal(shell.elements.get('[data-same-model-toggle]').checked, true);
+  assert.equal(shell.elements.get('[data-thinking-level-select]').value, 'low');
+  assert.equal(shell.elements.get('[data-topic-input]').value, 'Fresh topic');
+  assert.equal(shell.elements.get('[data-api-key-input]').value, '');
+  assert.match(shell.elements.get('[data-settings-status]').textContent, /not stored/i);
+});
+
 test('startApp shows friendly messages for load, generate, and clear failures', async () => {
   const loadShell = createShell();
   const generateShell = createShell();

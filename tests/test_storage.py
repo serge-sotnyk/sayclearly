@@ -42,15 +42,21 @@ def test_load_config_creates_default_storage_tree(tmp_path: Path, monkeypatch) -
     assert load_history(tmp_path).version == 1
 
 
-def test_load_config_uses_environment_model_defaults_for_new_storage(
+def test_load_config_keeps_product_defaults_in_storage_when_env_defaults_are_set(
     tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite-preview")
 
     config = load_config(tmp_path)
 
-    assert config.gemini.text_model == "gemini-3.1-flash-lite-preview"
-    assert config.gemini.analysis_model == "gemini-3.1-flash-lite-preview"
+    assert config.gemini.text_model == "gemini-3-flash-preview"
+    assert config.gemini.analysis_model == "gemini-3-flash-preview"
+    assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["gemini"] == {
+        "text_model": "gemini-3-flash-preview",
+        "analysis_model": "gemini-3-flash-preview",
+        "same_model_for_analysis": True,
+        "text_thinking_level": "high",
+    }
 
 
 def test_load_config_migrates_version_1_gemini_model_to_version_2_schema(tmp_path: Path) -> None:

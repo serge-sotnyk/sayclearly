@@ -661,7 +661,10 @@ export async function startApp(
       const config = await requestJson<PublicConfig>(fetchImpl, '/api/config/api-key', {
         method: 'DELETE',
       });
-      model = applyLoadedConfig(model, config);
+      model = {
+        ...model,
+        config,
+      };
       hasLoadedConfig = true;
       model = {
         ...model,

@@ -6,6 +6,11 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from sayclearly.gemini.catalog import (
+    PRODUCT_DEFAULT_ANALYSIS_MODEL,
+    PRODUCT_DEFAULT_TEXT_MODEL,
+    PRODUCT_DEFAULT_TEXT_THINKING_LEVEL,
+)
 from sayclearly.storage.models import HistoryStore, StoredConfig, StoredSecrets
 
 APP_DIR_NAME = ".sayclearly"
@@ -32,7 +37,7 @@ def ensure_storage_root(data_root: Path | None = None) -> Path:
     except OSError as exc:
         raise StorageError(f"Could not create storage root at {root}") from exc
 
-    _ensure_default_file(root / CONFIG_FILE_NAME, StoredConfig())
+    _ensure_default_file(root / CONFIG_FILE_NAME, _build_product_default_config())
     _ensure_default_file(root / SECRETS_FILE_NAME, StoredSecrets())
     _ensure_default_file(root / HISTORY_FILE_NAME, HistoryStore())
     return root
@@ -65,6 +70,28 @@ def _ensure_default_file(path: Path, model: BaseModel) -> None:
     atomic_write_json(path, model.model_dump(mode="json", exclude_none=True))
 
 
+def _build_product_default_config() -> StoredConfig:
+    return StoredConfig.model_validate(
+        {
+            "version": 2,
+            "text_language": "uk",
+            "analysis_language": "uk",
+            "ui_language": "en",
+            "same_language_for_analysis": True,
+            "last_topic_prompt": "",
+            "session_limit": 300,
+            "keep_last_audio": False,
+            "gemini": {
+                "text_model": PRODUCT_DEFAULT_TEXT_MODEL,
+                "analysis_model": PRODUCT_DEFAULT_ANALYSIS_MODEL,
+                "same_model_for_analysis": True,
+                "text_thinking_level": PRODUCT_DEFAULT_TEXT_THINKING_LEVEL,
+            },
+            "langfuse": {},
+        }
+    )
+
+
 def _load_model[ModelT: BaseModel](
     path: Path,
     model_type: type[ModelT],
@@ -95,8 +122,9 @@ def load_config(data_root: Path | None = None) -> StoredConfig:
     default_config = StoredConfig()
 
     if not path.exists():
-        atomic_write_json(path, default_config.model_dump(mode="json", exclude_none=True))
-        return default_config
+        product_default_config = _build_product_default_config()
+        atomic_write_json(path, product_default_config.model_dump(mode="json", exclude_none=True))
+        return product_default_config
 
     payload = _load_json_payload(path)
     migrated_payload = _migrate_config_payload(payload, default_config)

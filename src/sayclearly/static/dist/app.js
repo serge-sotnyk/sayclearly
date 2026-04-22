@@ -478,7 +478,10 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             const config = await requestJson(fetchImpl, '/api/config/api-key', {
                 method: 'DELETE',
             });
-            model = applyLoadedConfig(model, config);
+            model = {
+                ...model,
+                config,
+            };
             hasLoadedConfig = true;
             model = {
                 ...model,
