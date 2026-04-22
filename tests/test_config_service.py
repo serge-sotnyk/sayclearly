@@ -243,6 +243,23 @@ def test_get_public_config_enables_langfuse_only_when_env_runtime_is_complete(
     assert public.langfuse.secret_key_source == "env"
 
 
+def test_get_public_config_enables_langfuse_when_base_url_env_is_used(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    service = ConfigService(tmp_path)
+    service.update_config(make_payload())
+    monkeypatch.delenv("LANGFUSE_HOST", raising=False)
+    monkeypatch.setenv("LANGFUSE_BASE_URL", "https://env-langfuse.example")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "env-public")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "env-secret")
+
+    public = service.get_public_config()
+
+    assert public.langfuse.enabled is True
+    assert public.langfuse.host == "https://env-langfuse.example"
+
+
 def test_get_public_config_uses_env_defaults_when_storage_is_missing(
     tmp_path: Path, monkeypatch
 ) -> None:

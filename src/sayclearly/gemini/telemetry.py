@@ -8,8 +8,9 @@ from sayclearly.gemini.catalog import ThinkingLevel
 
 
 class GeminiGenerationTrace:
-    def __init__(self, observation: object | None = None) -> None:
+    def __init__(self, observation: object | None = None, client: object | None = None) -> None:
         self._observation = observation
+        self._client = client
 
     def record_success(self, output_text: str) -> None:
         self._update(output=output_text)
@@ -32,6 +33,18 @@ class GeminiGenerationTrace:
             return
         try:
             self._observation.end()
+        except Exception:
+            return
+        self._flush()
+
+    def _flush(self) -> None:
+        if self._client is None:
+            return
+        flush = getattr(self._client, "flush", None)
+        if flush is None:
+            return
+        try:
+            flush()
         except Exception:
             return
 
@@ -72,7 +85,7 @@ class GeminiTelemetry:
         except Exception:
             return GeminiGenerationTrace()
 
-        return GeminiGenerationTrace(observation)
+        return GeminiGenerationTrace(observation, langfuse_client)
 
     def _get_langfuse_client(self) -> object | None:
         if self._client_initialized:
@@ -81,7 +94,7 @@ class GeminiTelemetry:
         self._client_initialized = True
         public_key = self._get_env_value("LANGFUSE_PUBLIC_KEY")
         secret_key = self._get_env_value("LANGFUSE_SECRET_KEY")
-        host = self._get_env_value("LANGFUSE_HOST")
+        host = self._get_env_value("LANGFUSE_HOST") or self._get_env_value("LANGFUSE_BASE_URL")
         if public_key is None or secret_key is None or host is None:
             return None
 

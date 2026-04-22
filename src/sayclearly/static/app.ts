@@ -101,6 +101,7 @@ interface ShellElements {
   settingsStatus: HTMLElement;
   clearApiKeyButton: HTMLButtonElement;
   apiKeyInput: HTMLInputElement;
+  apiKeyHint: HTMLElement;
   textModelSelect: HTMLSelectElement;
   analysisModelSelect: HTMLSelectElement;
   sameModelToggle: HTMLInputElement;
@@ -176,6 +177,7 @@ function collectShellElements(root: RootLike): ShellElements {
     settingsStatus: getRequiredElement(root, '[data-settings-status]'),
     clearApiKeyButton: getRequiredElement(root, '[data-clear-api-key-button]'),
     apiKeyInput: getRequiredElement(root, '[data-api-key-input]'),
+    apiKeyHint: getRequiredElement(root, '[data-api-key-hint]'),
     textModelSelect: getRequiredElement(root, '[data-text-model-select]'),
     analysisModelSelect: getRequiredElement(root, '[data-analysis-model-select]'),
     sameModelToggle: getRequiredElement(root, '[data-same-model-toggle]'),
@@ -241,6 +243,30 @@ function getSettingsStatus(config: PublicConfig): string {
   }
 
   return 'API key status: not stored locally.';
+}
+
+function getApiKeyHint(config: PublicConfig): string {
+  if (config.gemini.api_key_source === 'env') {
+    return 'Using the Gemini API key from .env for this session.';
+  }
+
+  if (config.gemini.has_api_key) {
+    return 'A Gemini API key is stored locally. Paste a new key to replace it.';
+  }
+
+  return 'Paste a key here or use .env for local development.';
+}
+
+function getApiKeyPlaceholder(config: PublicConfig): string {
+  if (config.gemini.api_key_source === 'env') {
+    return 'Using API key from environment';
+  }
+
+  if (config.gemini.has_api_key) {
+    return 'Stored locally. Paste a new key to replace it';
+  }
+
+  return 'Paste your local API key';
 }
 
 function getStatusMessage(model: AppModel, reuseNextGeneration: boolean): string {
@@ -356,6 +382,8 @@ function render(
   elements.sameLanguageToggle.checked = model.settings.same_language_for_analysis;
   elements.topicInput.value = model.settings.topic_prompt;
   elements.settingsStatus.textContent = getSettingsStatus(model.config);
+  elements.apiKeyHint.textContent = getApiKeyHint(model.config);
+  elements.apiKeyInput.placeholder = getApiKeyPlaceholder(model.config);
   elements.statusMessage.textContent = getStatusMessage(model, reuseNextGeneration);
   elements.settingsPanel.hidden = !isSettingsOpen;
 

@@ -16,6 +16,7 @@ def test_home_page_renders_stage_3_shell() -> None:
     assert "data-status-message" in response.text
     assert "data-open-settings-button" in response.text
     assert "data-api-key-input" in response.text
+    assert "data-api-key-hint" in response.text
     assert "data-text-model-select" in response.text
     assert "data-analysis-model-select" in response.text
     assert "data-same-model-toggle" in response.text

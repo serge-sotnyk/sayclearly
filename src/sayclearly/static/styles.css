@@ -131,6 +131,12 @@ h2 {
     font-weight: 600;
 }
 
+.field-hint {
+    margin: -0.35rem 0 0;
+    font-size: 0.88rem;
+    color: #52606d;
+}
+
 .toggle-field {
     grid-template-columns: auto 1fr;
     align-items: center;

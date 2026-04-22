@@ -49,6 +49,7 @@ class FakeElement {
   constructor(initial = {}) {
     this.value = initial.value ?? '';
     this.src = initial.src ?? '';
+    this.placeholder = initial.placeholder ?? '';
     this.checked = initial.checked ?? false;
     this.hidden = initial.hidden ?? false;
     this.textContent = initial.textContent ?? '';
@@ -212,6 +213,7 @@ function createShell() {
     ['[data-screen="exercise"]', new FakeElement()],
     ['[data-settings-panel]', new FakeElement({ hidden: true })],
     ['[data-api-key-input]', new FakeElement()],
+    ['[data-api-key-hint]', new FakeElement()],
     ['[data-text-model-select]', new FakeElement()],
     ['[data-analysis-model-select]', new FakeElement()],
     ['[data-same-model-toggle]', new FakeElement()],
@@ -369,6 +371,23 @@ test('startApp loads config, renders the shell, and keeps languages synced while
 
   await shell.elements.get('[data-close-settings-button]').click();
   assert.equal(shell.elements.get('[data-settings-panel]').hidden, true);
+});
+
+test('startApp shows when the Gemini API key comes from .env', async () => {
+  const shell = createShell();
+  const config = createConfig({
+    gemini: {
+      ...createConfig().gemini,
+      has_api_key: true,
+      api_key_source: 'env',
+    },
+  });
+  const { fetchStub } = createFetchStub(createResponse(config));
+
+  await startApp(shell.document, fetchStub);
+
+  assert.match(shell.elements.get('[data-api-key-hint]').textContent, /\.env|environment/i);
+  assert.match(shell.elements.get('[data-api-key-input]').placeholder, /environment/i);
 });
 
 test('startApp disables the analysis model selector and saves a coherent gemini payload when same model is enabled', async () => {

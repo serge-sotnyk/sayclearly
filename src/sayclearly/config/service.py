@@ -46,10 +46,7 @@ class ConfigService:
             env_name="LANGFUSE_SECRET_KEY",
             stored_value=stored_secrets.langfuse.secret_key,
         )
-        langfuse_host, _ = self._resolve_value(
-            env_name="LANGFUSE_HOST",
-            stored_value=stored_config.langfuse.host,
-        )
+        langfuse_host = self._resolve_langfuse_host(stored_config.langfuse.host)
 
         return PublicConfigView(
             version=stored_config.version,
@@ -162,6 +159,17 @@ class ConfigService:
             return stored_value, "stored"
         return None, "none"
 
+    def _resolve_langfuse_host(self, stored_value: str | None) -> str | None:
+        host = self._get_env_override("LANGFUSE_HOST")
+        if host is not None:
+            return host
+
+        base_url = self._get_env_override("LANGFUSE_BASE_URL")
+        if base_url is not None:
+            return base_url
+
+        return stored_value
+
     def _get_env_override(self, env_name: str) -> str | None:
         env_value = os.getenv(env_name)
         if env_value is None:
@@ -172,7 +180,7 @@ class ConfigService:
 
     def _is_langfuse_runtime_enabled(self) -> bool:
         return bool(
-            self._get_env_override("LANGFUSE_HOST")
+            (self._get_env_override("LANGFUSE_HOST") or self._get_env_override("LANGFUSE_BASE_URL"))
             and self._get_env_override("LANGFUSE_PUBLIC_KEY")
             and self._get_env_override("LANGFUSE_SECRET_KEY")
         )

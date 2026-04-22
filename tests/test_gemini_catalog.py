@@ -13,5 +13,5 @@ def test_catalog_uses_verified_gemini_3_flash_preview_id() -> None:
     assert first_supported_model == {
         "id": "gemini-3-flash-preview",
         "label": "Gemini 3 Flash",
-        "free_tier_requests_per_day_hint": None,
+        "free_tier_requests_per_day_hint": 20,
     }

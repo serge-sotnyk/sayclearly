@@ -27,8 +27,9 @@ class FakeSdkClient:
 
 
 class FakeResponse:
-    def __init__(self, parsed) -> None:
+    def __init__(self, parsed, text: str | None = None) -> None:
         self.parsed = parsed
+        self.text = text
 
 
 class FailingObservation:
@@ -45,7 +46,9 @@ class FailingLangfuse:
 
 
 def test_generate_exercise_parses_structured_json_and_uses_model_config() -> None:
-    sdk_client = FakeSdkClient(FakeResponse({"text": "Speak clearly and stay relaxed."}))
+    sdk_client = FakeSdkClient(
+        FakeResponse(None, text='{"text": "Speak clearly and stay relaxed."}')
+    )
     client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
 
     exercise = client.generate_exercise(
@@ -61,7 +64,8 @@ def test_generate_exercise_parses_structured_json_and_uses_model_config() -> Non
     config = call["config"]
     assert config.temperature == 1
     assert config.response_mime_type == "application/json"
-    assert config.response_schema is GeneratedExercise
+    assert config.response_json_schema == GeneratedExercise.model_json_schema()
+    assert config.response_schema is None
     assert config.thinking_config.thinking_budget > 0
 
 

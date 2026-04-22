@@ -19,10 +19,14 @@ class FakeLangfuse:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
         self.observation = FakeObservation()
+        self.flush_calls = 0
 
     def start_observation(self, **kwargs: object) -> FakeObservation:
         self.calls.append(kwargs)
         return self.observation
+
+    def flush(self) -> None:
+        self.flush_calls += 1
 
 
 def test_start_text_generation_is_noop_when_langfuse_env_vars_are_absent(
@@ -78,3 +82,34 @@ def test_start_text_generation_records_success_with_langfuse_when_enabled(
     ]
     assert fake_langfuse.observation.updates == [{"output": "Speak slowly."}]
     assert fake_langfuse.observation.end_calls == 1
+    assert fake_langfuse.flush_calls == 1
+
+
+def test_start_text_generation_accepts_langfuse_base_url_env_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "public-key")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "secret-key")
+    monkeypatch.delenv("LANGFUSE_HOST", raising=False)
+    monkeypatch.setenv("LANGFUSE_BASE_URL", "https://langfuse.example")
+    factory_calls: list[dict[str, object]] = []
+
+    def fake_factory(**kwargs: object) -> FakeLangfuse:
+        factory_calls.append(kwargs)
+        return FakeLangfuse()
+
+    telemetry = GeminiTelemetry(langfuse_factory=fake_factory)
+
+    telemetry.start_text_generation(
+        prompt="Generate a short exercise.",
+        model="gemini-2.5-flash",
+        thinking_level="medium",
+    )
+
+    assert factory_calls == [
+        {
+            "public_key": "public-key",
+            "secret_key": "secret-key",
+            "base_url": "https://langfuse.example",
+        }
+    ]

@@ -89,7 +89,7 @@ class GeminiClient:
                 config=types.GenerateContentConfig(
                     temperature=1,
                     response_mime_type="application/json",
-                    response_schema=GeneratedExercise,
+                    response_json_schema=GeneratedExercise.model_json_schema(),
                     thinking_config=self._build_thinking_config(
                         model=model,
                         thinking_level=thinking_level,
@@ -105,10 +105,10 @@ class GeminiClient:
             raise GeminiProviderError("Gemini text generation request failed.") from exc
 
         try:
-            payload = response.parsed
-            if payload is None:
-                payload = GeneratedExercise.model_validate_json(response.text)
-            exercise = GeneratedExercise.model_validate(payload)
+            if isinstance(response.text, str) and response.text.strip() != "":
+                exercise = GeneratedExercise.model_validate_json(response.text)
+            else:
+                exercise = GeneratedExercise.model_validate(response.parsed)
         except Exception as exc:
             trace.record_error(str(exc))
             raise GeminiMalformedResponseError("Gemini returned malformed exercise text.") from exc
