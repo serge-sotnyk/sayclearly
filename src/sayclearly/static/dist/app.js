@@ -471,6 +471,14 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
         try {
             const formData = new FormData();
             formData.append('audio', recordedBlob, 'retelling.webm');
+            if (model.generated_exercise) {
+                const metadata = JSON.stringify({
+                    language: model.generated_exercise.language,
+                    analysis_language: model.generated_exercise.analysis_language,
+                    exercise_text: model.generated_exercise.text,
+                });
+                formData.append('metadata', metadata);
+            }
             const review = await requestJson(fetchImpl, '/api/analyze-recording', {
                 method: 'POST',
                 body: formData,
