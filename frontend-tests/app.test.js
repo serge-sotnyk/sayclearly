@@ -53,8 +53,17 @@ class FakeElement {
     this.hidden = initial.hidden ?? false;
     this.textContent = initial.textContent ?? '';
     this.disabled = initial.disabled ?? false;
+    this.children = initial.children ?? [];
     this.listeners = new Map();
     this.classList = new FakeClassList();
+  }
+
+  append(...children) {
+    this.children.push(...children);
+  }
+
+  replaceChildren(...children) {
+    this.children = [...children];
   }
 
   addEventListener(type, listener) {
@@ -153,9 +162,25 @@ function createConfig(overrides = {}) {
     session_limit: 10,
     keep_last_audio: false,
     gemini: {
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
+      text_model: 'gemini-3-flash-preview',
+      analysis_model: 'gemini-3.1-flash-lite-preview',
+      same_model_for_analysis: false,
+      text_thinking_level: 'medium',
       has_api_key: true,
       api_key_source: 'stored',
+      available_models: [
+        {
+          id: 'gemini-3-flash-preview',
+          label: 'Gemini 3 Flash',
+          free_tier_requests_per_day_hint: null,
+        },
+        {
+          id: 'gemini-2.5-flash',
+          label: 'Gemini 2.5 Flash',
+          free_tier_requests_per_day_hint: 250,
+        },
+      ],
     },
     langfuse: {
       host: null,
@@ -187,6 +212,10 @@ function createShell() {
     ['[data-screen="exercise"]', new FakeElement()],
     ['[data-settings-panel]', new FakeElement({ hidden: true })],
     ['[data-api-key-input]', new FakeElement()],
+    ['[data-text-model-select]', new FakeElement()],
+    ['[data-analysis-model-select]', new FakeElement()],
+    ['[data-same-model-toggle]', new FakeElement()],
+    ['[data-thinking-level-select]', new FakeElement()],
     ['[data-text-language-input]', new FakeElement()],
     ['[data-analysis-language-input]', new FakeElement()],
     ['[data-same-language-toggle]', new FakeElement({ checked: true })],
@@ -219,6 +248,9 @@ function createShell() {
 
   const root = new FakeRoot(elements);
   const document = {
+    createElement() {
+      return new FakeElement();
+    },
     querySelector(selector) {
       if (selector === '[data-app-root]') {
         return root;
@@ -307,9 +339,20 @@ test('startApp loads config, renders the shell, and keeps languages synced while
 
   assert.equal(shell.elements.get('[data-text-language-input]').value, 'uk');
   assert.equal(shell.elements.get('[data-analysis-language-input]').value, 'uk');
+  assert.equal(shell.elements.get('[data-text-model-select]').value, 'gemini-3-flash-preview');
+  assert.equal(
+    shell.elements.get('[data-analysis-model-select]').value,
+    'gemini-3.1-flash-lite-preview',
+  );
+  assert.equal(shell.elements.get('[data-same-model-toggle]').checked, false);
+  assert.equal(shell.elements.get('[data-thinking-level-select]').value, 'medium');
   assert.equal(shell.elements.get('[data-topic-input]').value, 'Morning routines');
   assert.match(shell.elements.get('[data-settings-status]').textContent, /stored/i);
   assert.equal(shell.elements.get('[data-settings-panel]').hidden, true);
+  assert.deepEqual(
+    shell.elements.get('[data-text-model-select]').children.map((option) => option.textContent),
+    ['Gemini 3 Flash', 'Gemini 2.5 Flash (250 RPD hint)'],
+  );
 
   await shell.elements.get('[data-open-settings-button]').click();
   assert.equal(shell.elements.get('[data-settings-panel]').hidden, false);
@@ -326,6 +369,48 @@ test('startApp loads config, renders the shell, and keeps languages synced while
 
   await shell.elements.get('[data-close-settings-button]').click();
   assert.equal(shell.elements.get('[data-settings-panel]').hidden, true);
+});
+
+test('startApp disables the analysis model selector and saves a coherent gemini payload when same model is enabled', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const { fetchStub, calls } = createFetchStub(
+    createResponse(config),
+    createResponse({
+      ...config,
+      gemini: {
+        ...config.gemini,
+        text_model: 'gemini-2.5-flash',
+        analysis_model: 'gemini-2.5-flash',
+        same_model_for_analysis: true,
+        model: 'gemini-2.5-flash',
+      },
+    }),
+    createResponse(exercise),
+  );
+
+  await startApp(shell.document, fetchStub);
+
+  shell.elements.get('[data-text-model-select]').value = 'gemini-2.5-flash';
+  await shell.elements.get('[data-text-model-select]').change();
+  shell.elements.get('[data-analysis-model-select]').value = 'gemini-3.1-flash-lite-preview';
+  await shell.elements.get('[data-analysis-model-select]').change();
+  shell.elements.get('[data-same-model-toggle]').checked = true;
+  await shell.elements.get('[data-same-model-toggle]').change();
+
+  assert.equal(shell.elements.get('[data-analysis-model-select]').disabled, true);
+  assert.equal(shell.elements.get('[data-analysis-model-select]').value, 'gemini-2.5-flash');
+
+  await shell.elements.get('[data-generate-button]').click();
+
+  assert.deepEqual(JSON.parse(calls[1].options.body).gemini, {
+    text_model: 'gemini-2.5-flash',
+    analysis_model: 'gemini-2.5-flash',
+    same_model_for_analysis: true,
+    text_thinking_level: 'medium',
+    api_key: null,
+  });
 });
 
 test('startApp saves config, generates text, advances steps, supports reuse, and resets home', async () => {
@@ -357,7 +442,10 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
     session_limit: 10,
     keep_last_audio: false,
     gemini: {
-      model: 'gemini-2.5-flash',
+      text_model: 'gemini-3-flash-preview',
+      analysis_model: 'gemini-3.1-flash-lite-preview',
+      same_model_for_analysis: false,
+      text_thinking_level: 'medium',
       api_key: null,
     },
     langfuse: {
@@ -422,9 +510,14 @@ test('startApp clears stored API keys and refreshes the rendered status', async 
   const loadedConfig = createConfig();
   const clearedConfig = createConfig({
     gemini: {
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
+      text_model: 'gemini-3-flash-preview',
+      analysis_model: 'gemini-3.1-flash-lite-preview',
+      same_model_for_analysis: false,
+      text_thinking_level: 'medium',
       has_api_key: false,
       api_key_source: 'none',
+      available_models: loadedConfig.gemini.available_models,
     },
   });
   const { fetchStub, calls } = createFetchStub(
@@ -461,8 +554,14 @@ test('startApp shows friendly messages for load, generate, and clear failures', 
     new Error('generation failed'),
   );
   await startApp(generateShell.document, generateFetch);
+  generateShell.elements.get('[data-topic-input]').value = 'Keep my topic';
+  await generateShell.elements.get('[data-topic-input]').input();
+  generateShell.elements.get('[data-text-model-select]').value = 'gemini-2.5-flash';
+  await generateShell.elements.get('[data-text-model-select]').change();
   await generateShell.elements.get('[data-generate-button]').click();
   assert.match(generateShell.elements.get('[data-status-message]').textContent, /could not generate/i);
+  assert.equal(generateShell.elements.get('[data-topic-input]').value, 'Keep my topic');
+  assert.equal(generateShell.elements.get('[data-text-model-select]').value, 'gemini-2.5-flash');
 
   const { fetchStub: clearFetch } = createFetchStub(
     createResponse(createConfig()),

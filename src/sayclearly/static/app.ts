@@ -15,6 +15,7 @@ import {
   startRecordingRequest,
   startGeneration,
   storeRecordedAudio,
+  syncAnalysisModel,
   syncAnalysisLanguage,
   type AppModel,
   type GeneratedExercise,
@@ -90,6 +91,10 @@ interface ShellElements {
   settingsStatus: HTMLElement;
   clearApiKeyButton: HTMLButtonElement;
   apiKeyInput: HTMLInputElement;
+  textModelSelect: HTMLSelectElement;
+  analysisModelSelect: HTMLSelectElement;
+  sameModelToggle: HTMLInputElement;
+  thinkingLevelSelect: HTMLSelectElement;
   textLanguageInput: HTMLInputElement;
   analysisLanguageInput: HTMLInputElement;
   sameLanguageToggle: HTMLInputElement;
@@ -161,6 +166,10 @@ function collectShellElements(root: RootLike): ShellElements {
     settingsStatus: getRequiredElement(root, '[data-settings-status]'),
     clearApiKeyButton: getRequiredElement(root, '[data-clear-api-key-button]'),
     apiKeyInput: getRequiredElement(root, '[data-api-key-input]'),
+    textModelSelect: getRequiredElement(root, '[data-text-model-select]'),
+    analysisModelSelect: getRequiredElement(root, '[data-analysis-model-select]'),
+    sameModelToggle: getRequiredElement(root, '[data-same-model-toggle]'),
+    thinkingLevelSelect: getRequiredElement(root, '[data-thinking-level-select]'),
     textLanguageInput: getRequiredElement(root, '[data-text-language-input]'),
     analysisLanguageInput: getRequiredElement(root, '[data-analysis-language-input]'),
     sameLanguageToggle: getRequiredElement(root, '[data-same-language-toggle]'),
@@ -187,6 +196,29 @@ function collectShellElements(root: RootLike): ShellElements {
     stepInstruction: getRequiredElement(root, '[data-step-instruction]'),
     exerciseText: getRequiredElement(root, '[data-exercise-text]'),
   };
+}
+
+function formatModelLabel(model: PublicConfig['gemini']['available_models'][number]): string {
+  if (model.free_tier_requests_per_day_hint === null) {
+    return model.label;
+  }
+
+  return `${model.label} (${model.free_tier_requests_per_day_hint} RPD hint)`;
+}
+
+function renderModelOptions(
+  documentRef: Document,
+  select: HTMLSelectElement,
+  models: PublicConfig['gemini']['available_models'],
+): void {
+  const options = models.map((model) => {
+    const option = documentRef.createElement('option');
+    option.value = model.id;
+    option.textContent = formatModelLabel(model);
+    return option;
+  });
+
+  select.replaceChildren(...options);
 }
 
 function getSettingsStatus(config: PublicConfig): string {
@@ -222,13 +254,19 @@ function getStatusMessage(model: AppModel, reuseNextGeneration: boolean): string
 }
 
 function readSettings(elements: ShellElements, reuseLastTopic: boolean): SettingsFormState {
-  return syncAnalysisLanguage({
-    text_language: elements.textLanguageInput.value.trim(),
-    analysis_language: elements.analysisLanguageInput.value.trim(),
-    same_language_for_analysis: elements.sameLanguageToggle.checked,
-    topic_prompt: elements.topicInput.value.trim(),
-    reuse_last_topic: reuseLastTopic,
-  });
+  return syncAnalysisModel(
+    syncAnalysisLanguage({
+      text_language: elements.textLanguageInput.value.trim(),
+      analysis_language: elements.analysisLanguageInput.value.trim(),
+      same_language_for_analysis: elements.sameLanguageToggle.checked,
+      text_model: elements.textModelSelect.value,
+      analysis_model: elements.analysisModelSelect.value,
+      same_model_for_analysis: elements.sameModelToggle.checked,
+      text_thinking_level: elements.thinkingLevelSelect.value as SettingsFormState['text_thinking_level'],
+      topic_prompt: elements.topicInput.value.trim(),
+      reuse_last_topic: reuseLastTopic,
+    }),
+  );
 }
 
 function buildConfigRequest(
@@ -242,7 +280,7 @@ function buildConfigRequest(
   return {
     ...nextConfig,
     gemini: {
-      model: nextConfig.gemini.model,
+      ...nextConfig.gemini,
       api_key: trimmedApiKey === '' ? null : trimmedApiKey,
     },
   };
@@ -274,12 +312,20 @@ async function requestJson<T>(
 }
 
 function render(
+  documentRef: Document,
   elements: ShellElements,
   model: AppModel,
   isSettingsOpen: boolean,
   reuseNextGeneration: boolean,
   recordedUrl: string | null,
 ): void {
+  renderModelOptions(documentRef, elements.textModelSelect, model.config.gemini.available_models);
+  renderModelOptions(documentRef, elements.analysisModelSelect, model.config.gemini.available_models);
+  elements.textModelSelect.value = model.settings.text_model;
+  elements.analysisModelSelect.value = model.settings.analysis_model;
+  elements.sameModelToggle.checked = model.settings.same_model_for_analysis;
+  elements.thinkingLevelSelect.value = model.settings.text_thinking_level;
+  elements.analysisModelSelect.disabled = model.settings.same_model_for_analysis;
   elements.textLanguageInput.value = model.settings.text_language;
   elements.analysisLanguageInput.value = model.settings.analysis_language;
   elements.sameLanguageToggle.checked = model.settings.same_language_for_analysis;
@@ -411,7 +457,7 @@ export async function startApp(
       ...model,
       settings: nextSettings,
     };
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   };
 
   const refreshFromInputs = (): void => {
@@ -420,12 +466,12 @@ export async function startApp(
 
   elements.openSettingsButton.addEventListener('click', () => {
     isSettingsOpen = true;
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   elements.closeSettingsButton.addEventListener('click', () => {
     isSettingsOpen = false;
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   elements.textLanguageInput.addEventListener('input', () => {
@@ -433,6 +479,22 @@ export async function startApp(
   });
 
   elements.analysisLanguageInput.addEventListener('input', () => {
+    refreshFromInputs();
+  });
+
+  elements.textModelSelect.addEventListener('change', () => {
+    refreshFromInputs();
+  });
+
+  elements.analysisModelSelect.addEventListener('change', () => {
+    refreshFromInputs();
+  });
+
+  elements.sameModelToggle.addEventListener('change', () => {
+    refreshFromInputs();
+  });
+
+  elements.thinkingLevelSelect.addEventListener('change', () => {
     refreshFromInputs();
   });
 
@@ -454,18 +516,18 @@ export async function startApp(
 
   elements.nextStepButton.addEventListener('click', () => {
     model = advanceExerciseStep(model);
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   elements.startRecordingButton.addEventListener('click', async () => {
     if (!recordingApi.isSupported()) {
       model = applyRecordingError(model, 'This browser does not support microphone recording.');
-      render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
       return;
     }
 
     model = startRecordingRequest(model);
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
 
     const recorderToken = activeRecorderToken + 1;
     activeRecorderToken = recorderToken;
@@ -499,7 +561,7 @@ export async function startApp(
         if (blob.size === 0) {
           clearRecordingArtifacts();
           model = applyRecordingError(model, 'No recording was captured. Please try again.');
-          render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+          render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
           return;
         }
 
@@ -509,7 +571,7 @@ export async function startApp(
         recordedBlob = blob;
         recordedUrl = recordingApi.createObjectURL(blob);
         model = storeRecordedAudio(model);
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
       });
       recorder.start();
       model = markRecordingStarted(model);
@@ -522,7 +584,7 @@ export async function startApp(
       model = applyRecordingError(model, 'Microphone access was unavailable. Please try again.');
     }
 
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   elements.stopRecordingButton.addEventListener('click', () => {
@@ -532,12 +594,12 @@ export async function startApp(
   elements.analyzeRecordingButton.addEventListener('click', async () => {
     if (recordedBlob === null) {
       model = applyRecordingError(model, 'No recording was captured. Please try again.');
-      render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
       return;
     }
 
     model = startRecordingAnalysis(model);
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
 
     try {
       const formData = new FormData();
@@ -551,13 +613,13 @@ export async function startApp(
       model = applyAnalysisError(model, 'Could not upload the recording. Try again.');
     }
 
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   elements.recordAgainButton.addEventListener('click', () => {
     clearRecordingArtifacts();
     model = resetRecording(model);
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   elements.resetButton.addEventListener('click', () => {
@@ -565,7 +627,7 @@ export async function startApp(
     clearRecordingArtifacts();
     const resetModel = createInitialAppModel();
     model = applyLoadedConfig(resetModel, model.config);
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   elements.clearApiKeyButton.addEventListener('click', async () => {
@@ -579,7 +641,7 @@ export async function startApp(
         error_message: null,
       };
       elements.apiKeyInput.value = '';
-      render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     } catch {
       elements.settingsStatus.textContent = CLEAR_ERROR_STATUS;
     }
@@ -592,7 +654,7 @@ export async function startApp(
       settings,
     };
     model = startGeneration(model);
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
 
     try {
       const savedConfig = await requestJson<PublicConfig>(fetchImpl, '/api/config', {
@@ -601,7 +663,10 @@ export async function startApp(
           buildConfigRequest(model.config, settings, elements.apiKeyInput.value),
         ),
       });
-      model = applyLoadedConfig(model, savedConfig);
+      model = {
+        ...model,
+        config: savedConfig,
+      };
 
       const exercise = await requestJson<GeneratedExercise>(fetchImpl, '/api/generate-text', {
         method: 'POST',
@@ -614,14 +679,14 @@ export async function startApp(
       model = applyGenerationError(model, GENERATE_ERROR_STATUS);
     }
 
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   model = {
     ...model,
     error_message: LOADING_STATUS,
   };
-  render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+  render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
 
   try {
     const config = await requestJson<PublicConfig>(fetchImpl, '/api/config', {
@@ -640,7 +705,7 @@ export async function startApp(
     };
   }
 
-  render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+  render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
 }
 
 if (typeof document !== 'undefined' && typeof fetch !== 'undefined') {

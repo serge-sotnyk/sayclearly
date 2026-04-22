@@ -12,11 +12,23 @@ export type FlowState =
   | 'error';
 
 type ConfigSource = 'env' | 'stored' | 'none';
+type ThinkingLevel = 'low' | 'medium' | 'high';
+
+interface GeminiModelCatalogEntry {
+  id: string;
+  label: string;
+  free_tier_requests_per_day_hint: number | null;
+}
 
 interface GeminiPublicConfig {
   model: string;
+  text_model: string;
+  analysis_model: string;
+  same_model_for_analysis: boolean;
+  text_thinking_level: ThinkingLevel;
   has_api_key: boolean;
   api_key_source: ConfigSource;
+  available_models: GeminiModelCatalogEntry[];
 }
 
 interface LangfusePublicConfig {
@@ -45,6 +57,10 @@ export interface SettingsFormState {
   text_language: string;
   analysis_language: string;
   same_language_for_analysis: boolean;
+  text_model: string;
+  analysis_model: string;
+  same_model_for_analysis: boolean;
+  text_thinking_level: ThinkingLevel;
   topic_prompt: string;
   reuse_last_topic: boolean;
 }
@@ -80,7 +96,10 @@ interface ConfigUpdatePayload {
   session_limit: number;
   keep_last_audio: boolean;
   gemini: {
-    model: string;
+    text_model: string;
+    analysis_model: string;
+    same_model_for_analysis: boolean;
+    text_thinking_level: ThinkingLevel;
     api_key: string | null;
   };
   langfuse: {
@@ -111,9 +130,14 @@ const DEFAULT_CONFIG: PublicConfig = {
   session_limit: 10,
   keep_last_audio: false,
   gemini: {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-flash-preview',
+    text_model: 'gemini-3-flash-preview',
+    analysis_model: 'gemini-3-flash-preview',
+    same_model_for_analysis: true,
+    text_thinking_level: 'high',
     has_api_key: false,
     api_key_source: 'none',
+    available_models: [],
   },
   langfuse: {
     host: null,
@@ -126,10 +150,14 @@ const DEFAULT_CONFIG: PublicConfig = {
 };
 
 function buildSettingsFromConfig(config: PublicConfig): SettingsFormState {
-  return syncAnalysisLanguage({
+  return syncSettings({
     text_language: config.text_language,
     analysis_language: config.analysis_language,
     same_language_for_analysis: config.same_language_for_analysis,
+    text_model: config.gemini.text_model,
+    analysis_model: config.gemini.analysis_model,
+    same_model_for_analysis: config.gemini.same_model_for_analysis,
+    text_thinking_level: config.gemini.text_thinking_level,
     topic_prompt: config.last_topic_prompt,
     reuse_last_topic: false,
   });
@@ -159,6 +187,21 @@ export function syncAnalysisLanguage(settings: SettingsFormState): SettingsFormS
   };
 }
 
+export function syncAnalysisModel(settings: SettingsFormState): SettingsFormState {
+  if (!settings.same_model_for_analysis) {
+    return { ...settings };
+  }
+
+  return {
+    ...settings,
+    analysis_model: settings.text_model,
+  };
+}
+
+function syncSettings(settings: SettingsFormState): SettingsFormState {
+  return syncAnalysisModel(syncAnalysisLanguage(settings));
+}
+
 export function applyLoadedConfig(model: AppModel, config: PublicConfig): AppModel {
   return {
     ...model,
@@ -168,7 +211,7 @@ export function applyLoadedConfig(model: AppModel, config: PublicConfig): AppMod
 }
 
 export function buildGenerateRequest(settings: SettingsFormState): GenerateRequest {
-  const syncedSettings = syncAnalysisLanguage(settings);
+  const syncedSettings = syncSettings(settings);
 
   return {
     language: syncedSettings.text_language,
@@ -182,7 +225,7 @@ export function buildConfigUpdatePayload(
   config: PublicConfig,
   settings: SettingsFormState,
 ): ConfigUpdatePayload {
-  const syncedSettings = syncAnalysisLanguage(settings);
+  const syncedSettings = syncSettings(settings);
   const lastTopicPrompt =
     syncedSettings.reuse_last_topic && syncedSettings.topic_prompt === ''
       ? config.last_topic_prompt
@@ -197,7 +240,10 @@ export function buildConfigUpdatePayload(
     session_limit: config.session_limit,
     keep_last_audio: config.keep_last_audio,
     gemini: {
-      model: config.gemini.model,
+      text_model: syncedSettings.text_model,
+      analysis_model: syncedSettings.analysis_model,
+      same_model_for_analysis: syncedSettings.same_model_for_analysis,
+      text_thinking_level: syncedSettings.text_thinking_level,
       api_key: null,
     },
     langfuse: {
@@ -212,7 +258,7 @@ export function startGeneration(model: AppModel): AppModel {
   return {
     ...model,
     flow: 'generating_text',
-    settings: syncAnalysisLanguage(model.settings),
+    settings: syncSettings(model.settings),
     generated_exercise: null,
     error_message: null,
   };

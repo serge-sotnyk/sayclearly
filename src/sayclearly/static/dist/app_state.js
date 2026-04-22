@@ -8,9 +8,14 @@ const DEFAULT_CONFIG = {
     session_limit: 10,
     keep_last_audio: false,
     gemini: {
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
+        text_model: 'gemini-3-flash-preview',
+        analysis_model: 'gemini-3-flash-preview',
+        same_model_for_analysis: true,
+        text_thinking_level: 'high',
         has_api_key: false,
         api_key_source: 'none',
+        available_models: [],
     },
     langfuse: {
         host: null,
@@ -22,10 +27,14 @@ const DEFAULT_CONFIG = {
     },
 };
 function buildSettingsFromConfig(config) {
-    return syncAnalysisLanguage({
+    return syncSettings({
         text_language: config.text_language,
         analysis_language: config.analysis_language,
         same_language_for_analysis: config.same_language_for_analysis,
+        text_model: config.gemini.text_model,
+        analysis_model: config.gemini.analysis_model,
+        same_model_for_analysis: config.gemini.same_model_for_analysis,
+        text_thinking_level: config.gemini.text_thinking_level,
         topic_prompt: config.last_topic_prompt,
         reuse_last_topic: false,
     });
@@ -51,6 +60,18 @@ export function syncAnalysisLanguage(settings) {
         analysis_language: settings.text_language,
     };
 }
+export function syncAnalysisModel(settings) {
+    if (!settings.same_model_for_analysis) {
+        return { ...settings };
+    }
+    return {
+        ...settings,
+        analysis_model: settings.text_model,
+    };
+}
+function syncSettings(settings) {
+    return syncAnalysisModel(syncAnalysisLanguage(settings));
+}
 export function applyLoadedConfig(model, config) {
     return {
         ...model,
@@ -59,7 +80,7 @@ export function applyLoadedConfig(model, config) {
     };
 }
 export function buildGenerateRequest(settings) {
-    const syncedSettings = syncAnalysisLanguage(settings);
+    const syncedSettings = syncSettings(settings);
     return {
         language: syncedSettings.text_language,
         analysis_language: syncedSettings.analysis_language,
@@ -68,7 +89,7 @@ export function buildGenerateRequest(settings) {
     };
 }
 export function buildConfigUpdatePayload(config, settings) {
-    const syncedSettings = syncAnalysisLanguage(settings);
+    const syncedSettings = syncSettings(settings);
     const lastTopicPrompt = syncedSettings.reuse_last_topic && syncedSettings.topic_prompt === ''
         ? config.last_topic_prompt
         : syncedSettings.topic_prompt;
@@ -81,7 +102,10 @@ export function buildConfigUpdatePayload(config, settings) {
         session_limit: config.session_limit,
         keep_last_audio: config.keep_last_audio,
         gemini: {
-            model: config.gemini.model,
+            text_model: syncedSettings.text_model,
+            analysis_model: syncedSettings.analysis_model,
+            same_model_for_analysis: syncedSettings.same_model_for_analysis,
+            text_thinking_level: syncedSettings.text_thinking_level,
             api_key: null,
         },
         langfuse: {
@@ -95,7 +119,7 @@ export function startGeneration(model) {
     return {
         ...model,
         flow: 'generating_text',
-        settings: syncAnalysisLanguage(model.settings),
+        settings: syncSettings(model.settings),
         generated_exercise: null,
         error_message: null,
     };
