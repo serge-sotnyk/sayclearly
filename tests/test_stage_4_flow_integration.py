@@ -65,6 +65,9 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
 
     analyze_response = client.post(
         "/api/analyze-recording",
+        data={
+            "metadata": '{"language":"en","analysis_language":"uk","exercise_text":"Order your coffee clearly, then thank the barista with a calm and steady voice."}'
+        },
         files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
     )
 

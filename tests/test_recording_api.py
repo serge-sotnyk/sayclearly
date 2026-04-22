@@ -7,7 +7,33 @@ from sayclearly.app import create_app
 from sayclearly.storage.files import StorageError
 
 
-def test_post_analyze_recording_returns_stub_review(tmp_path: Path) -> None:
+def test_post_analyze_recording_returns_review_with_metadata(tmp_path: Path) -> None:
+    client = TestClient(create_app(tmp_path))
+
+    with patch(
+        "sayclearly.recording.api.RecordingService.analyze_recording",
+        return_value={
+            "summary": "Good effort.",
+            "clarity": "Clear.",
+            "pace": "Steady.",
+            "hesitations": [],
+            "recommendations": ["Keep practicing."],
+        },
+    ):
+        response = client.post(
+            "/api/analyze-recording",
+            data={"metadata": '{"language":"uk","analysis_language":"uk","exercise_text":"Fox"}'},
+            files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]
+    assert payload["clarity"]
+    assert payload["pace"]
+
+
+def test_post_analyze_recording_returns_400_when_metadata_is_missing(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
 
     response = client.post(
@@ -15,22 +41,19 @@ def test_post_analyze_recording_returns_stub_review(tmp_path: Path) -> None:
         files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["summary"]
-    assert payload["clarity"]
-    assert payload["pace"]
-    assert payload["hesitations"]
-    assert payload["recommendations"]
+    assert response.status_code == 400
 
 
-def test_post_analyze_recording_returns_400_when_audio_field_is_missing(tmp_path: Path) -> None:
+def test_post_analyze_recording_returns_400_when_metadata_is_invalid_json(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
 
-    response = client.post("/api/analyze-recording", files={})
+    response = client.post(
+        "/api/analyze-recording",
+        data={"metadata": "not-json"},
+        files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
+    )
 
     assert response.status_code == 400
-    assert response.json()["detail"][0]["loc"][0] == "body"
 
 
 def test_post_analyze_recording_returns_400_for_empty_uploaded_file(tmp_path: Path) -> None:
@@ -38,11 +61,11 @@ def test_post_analyze_recording_returns_400_for_empty_uploaded_file(tmp_path: Pa
 
     response = client.post(
         "/api/analyze-recording",
+        data={"metadata": '{"language":"uk","analysis_language":"uk","exercise_text":"Fox"}'},
         files={"audio": ("empty.webm", b"", "audio/webm")},
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == ""
 
 
 def test_post_analyze_recording_returns_500_for_storage_error(tmp_path: Path) -> None:
@@ -54,6 +77,7 @@ def test_post_analyze_recording_returns_500_for_storage_error(tmp_path: Path) ->
     ):
         response = client.post(
             "/api/analyze-recording",
+            data={"metadata": '{"language":"uk","analysis_language":"uk","exercise_text":"Fox"}'},
             files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
         )
 
