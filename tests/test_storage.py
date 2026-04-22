@@ -23,8 +23,8 @@ def test_load_config_creates_default_storage_tree(tmp_path: Path, monkeypatch) -
 
     assert config.version == 2
     assert config.text_language == "uk"
-    assert config.gemini.text_model == "gemini-3-flash"
-    assert config.gemini.analysis_model == "gemini-3-flash"
+    assert config.gemini.text_model == "gemini-3-flash-preview"
+    assert config.gemini.analysis_model == "gemini-3-flash-preview"
     assert config.gemini.same_model_for_analysis is True
     assert config.gemini.text_thinking_level == "high"
     assert (tmp_path / "cache").is_dir()
@@ -110,8 +110,8 @@ def test_load_config_migrates_version_1_without_gemini_model_using_defaults(
     config = load_config(tmp_path)
 
     assert config.version == 2
-    assert config.gemini.text_model == "gemini-3-flash"
-    assert config.gemini.analysis_model == "gemini-3-flash"
+    assert config.gemini.text_model == "gemini-3-flash-preview"
+    assert config.gemini.analysis_model == "gemini-3-flash-preview"
     assert config.gemini.same_model_for_analysis is True
     assert config.gemini.text_thinking_level == "high"
     assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8")) == {
@@ -124,8 +124,8 @@ def test_load_config_migrates_version_1_without_gemini_model_using_defaults(
         "session_limit": 300,
         "keep_last_audio": False,
         "gemini": {
-            "text_model": "gemini-3-flash",
-            "analysis_model": "gemini-3-flash",
+            "text_model": "gemini-3-flash-preview",
+            "analysis_model": "gemini-3-flash-preview",
             "same_model_for_analysis": True,
             "text_thinking_level": "high",
         },

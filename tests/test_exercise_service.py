@@ -212,7 +212,7 @@ def test_generate_text_uses_default_generation_settings_when_not_overridden(
     assert client.calls == [
         {
             "prompt": client.calls[0]["prompt"],
-            "model": "gemini-3-flash",
+            "model": "gemini-3-flash-preview",
             "thinking_level": "high",
         }
     ]

@@ -56,7 +56,7 @@ def test_generate_exercise_uses_thinking_level_for_default_gemini_3_models() -> 
 
     client.generate_exercise(
         prompt="Generate a reading exercise.",
-        model="gemini-3-flash",
+        model="gemini-3-flash-preview",
         thinking_level="high",
     )
 

@@ -15,7 +15,7 @@ def make_payload() -> dict[str, object]:
         "session_limit": 250,
         "keep_last_audio": False,
         "gemini": {
-            "text_model": "gemini-3-flash",
+            "text_model": "gemini-3-flash-preview",
             "analysis_model": "gemini-3.1-flash-lite-preview",
             "same_model_for_analysis": False,
             "text_thinking_level": "medium",
@@ -36,9 +36,9 @@ def test_get_config_returns_public_contract(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json()["gemini"] == {
-        "model": "gemini-3-flash",
-        "text_model": "gemini-3-flash",
-        "analysis_model": "gemini-3-flash",
+        "model": "gemini-3-flash-preview",
+        "text_model": "gemini-3-flash-preview",
+        "analysis_model": "gemini-3-flash-preview",
         "same_model_for_analysis": True,
         "text_thinking_level": "high",
         "has_api_key": False,
@@ -59,7 +59,7 @@ def test_post_config_persists_changes_across_app_recreation(tmp_path: Path) -> N
     assert get_response.json()["text_language"] == "en"
     assert get_response.json()["gemini"]["has_api_key"] is True
     assert get_response.json()["gemini"]["api_key_source"] == "stored"
-    assert get_response.json()["gemini"]["text_model"] == "gemini-3-flash"
+    assert get_response.json()["gemini"]["text_model"] == "gemini-3-flash-preview"
     assert get_response.json()["gemini"]["analysis_model"] == "gemini-3.1-flash-lite-preview"
 
 

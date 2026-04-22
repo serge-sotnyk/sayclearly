@@ -3,7 +3,7 @@ from typing import Literal, TypedDict
 
 ThinkingLevel = Literal["low", "medium", "high"]
 
-PRODUCT_DEFAULT_TEXT_MODEL = "gemini-3-flash"
+PRODUCT_DEFAULT_TEXT_MODEL = "gemini-3-flash-preview"
 PRODUCT_DEFAULT_ANALYSIS_MODEL = PRODUCT_DEFAULT_TEXT_MODEL
 PRODUCT_DEFAULT_TEXT_THINKING_LEVEL: ThinkingLevel = "high"
 
@@ -16,7 +16,7 @@ class GeminiModelCatalogEntry(TypedDict):
 
 SUPPORTED_GEMINI_MODELS: tuple[GeminiModelCatalogEntry, ...] = (
     {
-        "id": "gemini-3-flash",
+        "id": "gemini-3-flash-preview",
         "label": "Gemini 3 Flash",
         "free_tier_requests_per_day_hint": None,
     },
