@@ -7,8 +7,10 @@ from sayclearly.exercise.models import (
     ExerciseGenerationResponse,
 )
 from sayclearly.exercise.prompts import build_exercise_generation_prompt
+from sayclearly.gemini.catalog import sanitize_text_model
 from sayclearly.gemini.client import (
     GeminiClient,
+    GeminiInvalidCredentialsError,
     GeminiMalformedResponseError,
     MissingGeminiApiKeyError,
 )
@@ -26,6 +28,10 @@ class ExerciseServiceConfigurationError(ExerciseServiceError):
 
 class ExerciseGenerationProviderError(ExerciseServiceError):
     """Raised when exercise generation is unavailable from the provider."""
+
+
+class ExerciseGenerationInvalidCredentialsError(ExerciseServiceError):
+    """Raised when the configured Gemini credentials are rejected."""
 
 
 class ExerciseService:
@@ -59,12 +65,16 @@ class ExerciseService:
         try:
             generated_exercise = client.generate_exercise(
                 prompt=prompt,
-                model=config.gemini.text_model,
+                model=sanitize_text_model(config.gemini.text_model),
                 thinking_level=config.gemini.text_thinking_level,
             )
         except MissingGeminiApiKeyError as exc:
             raise ExerciseServiceConfigurationError(
                 "Gemini API key is required before generating text."
+            ) from exc
+        except GeminiInvalidCredentialsError as exc:
+            raise ExerciseGenerationInvalidCredentialsError(
+                "Gemini API key was rejected. Update it and try again."
             ) from exc
         except GeminiMalformedResponseError as exc:
             raise ExerciseGenerationProviderError(

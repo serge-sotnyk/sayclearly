@@ -2,6 +2,7 @@ import pytest
 
 from sayclearly.gemini.client import (
     GeminiClient,
+    GeminiInvalidCredentialsError,
     GeminiMalformedResponseError,
     GeneratedExercise,
 )
@@ -92,6 +93,24 @@ def test_generate_exercise_rejects_clearly_malformed_model_output(text: str) -> 
     client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
 
     with pytest.raises(GeminiMalformedResponseError):
+        client.generate_exercise(
+            prompt="Generate a reading exercise.",
+            model="gemini-2.5-flash",
+            thinking_level="low",
+        )
+
+
+def test_generate_exercise_classifies_invalid_api_key_errors() -> None:
+    class FakeApiError(Exception):
+        def __init__(self) -> None:
+            self.code = 401
+            self.message = "API key not valid. Please pass a valid API key."
+            super().__init__(self.message)
+
+    sdk_client = FakeSdkClient(FakeApiError())
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
+
+    with pytest.raises(GeminiInvalidCredentialsError, match="API key"):
         client.generate_exercise(
             prompt="Generate a reading exercise.",
             model="gemini-2.5-flash",

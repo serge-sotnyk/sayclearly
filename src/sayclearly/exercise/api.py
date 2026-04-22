@@ -12,6 +12,7 @@ from sayclearly.exercise.models import (
     ExerciseGenerationResponse,
 )
 from sayclearly.exercise.service import (
+    ExerciseGenerationInvalidCredentialsError,
     ExerciseGenerationProviderError,
     ExerciseService,
     ExerciseServiceConfigurationError,
@@ -65,6 +66,8 @@ def build_exercise_router(data_root: Path | None = None) -> APIRouter:
         try:
             return service.generate_text(payload)
         except ExerciseServiceConfigurationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except ExerciseGenerationInvalidCredentialsError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except ExerciseGenerationProviderError as exc:
             raise HTTPException(

@@ -30,6 +30,10 @@ class GeminiProviderError(GeminiClientError):
     """Raised when the Gemini provider request fails."""
 
 
+class GeminiInvalidCredentialsError(GeminiClientError):
+    """Raised when the configured Gemini credentials are rejected."""
+
+
 class GeminiMalformedResponseError(GeminiClientError):
     """Raised when Gemini returns a clearly invalid payload."""
 
@@ -94,6 +98,10 @@ class GeminiClient:
             )
         except Exception as exc:  # pragma: no cover - SDK-specific failures vary
             trace.record_error(str(exc))
+            if _is_invalid_credentials_error(exc):
+                raise GeminiInvalidCredentialsError(
+                    "Gemini API key was rejected. Update it and try again."
+                ) from exc
             raise GeminiProviderError("Gemini text generation request failed.") from exc
 
         try:
@@ -118,3 +126,21 @@ class GeminiClient:
             return types.ThinkingConfig(thinking_level=_THINKING_LEVELS[thinking_level])
 
         return types.ThinkingConfig(thinking_budget=_THINKING_BUDGETS[thinking_level])
+
+
+def _is_invalid_credentials_error(exc: Exception) -> bool:
+    code = getattr(exc, "code", None)
+    if code not in {401, 403}:
+        return False
+
+    message = getattr(exc, "message", str(exc)).lower()
+    return any(
+        marker in message
+        for marker in (
+            "api key",
+            "authentication",
+            "unauthenticated",
+            "permission denied",
+            "credentials",
+        )
+    )

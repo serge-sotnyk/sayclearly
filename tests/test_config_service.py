@@ -226,6 +226,21 @@ def test_get_public_config_uses_explicit_analysis_env_default(tmp_path: Path, mo
     assert public.gemini.analysis_model == "gemini-3.1-flash-lite-preview"
 
 
+def test_get_public_config_sanitizes_unsupported_stored_gemini_models(tmp_path: Path) -> None:
+    service = ConfigService(tmp_path)
+    service.update_config(make_payload())
+    config_path = tmp_path / "config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["gemini"]["text_model"] = "gemini-1.5-pro"
+    payload["gemini"]["analysis_model"] = "custom-hand-edited-model"
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    public = service.get_public_config()
+
+    assert public.gemini.text_model == "gemini-3-flash-preview"
+    assert public.gemini.analysis_model == "gemini-3-flash-preview"
+
+
 def test_update_config_persists_public_and_secret_values_in_separate_files(tmp_path: Path) -> None:
     service = ConfigService(tmp_path)
 

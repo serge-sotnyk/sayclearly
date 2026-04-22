@@ -9,7 +9,11 @@ from sayclearly.config.models import (
     LangfusePublicConfig,
     PublicConfigView,
 )
-from sayclearly.gemini.catalog import get_supported_gemini_models
+from sayclearly.gemini.catalog import (
+    get_supported_gemini_models,
+    sanitize_analysis_model,
+    sanitize_text_model,
+)
 from sayclearly.storage.files import load_config, load_secrets, save_config, save_secrets
 
 
@@ -20,6 +24,8 @@ class ConfigService:
     def get_public_config(self) -> PublicConfigView:
         stored_config = load_config(self.data_root)
         stored_secrets = load_secrets(self.data_root)
+        effective_text_model = sanitize_text_model(stored_config.gemini.text_model)
+        effective_analysis_model = sanitize_analysis_model(stored_config.gemini.analysis_model)
 
         gemini_api_key, gemini_source = self._resolve_secret(
             env_name="GEMINI_API_KEY",
@@ -48,8 +54,8 @@ class ConfigService:
             session_limit=stored_config.session_limit,
             keep_last_audio=stored_config.keep_last_audio,
             gemini=GeminiPublicConfig(
-                text_model=stored_config.gemini.text_model,
-                analysis_model=stored_config.gemini.analysis_model,
+                text_model=effective_text_model,
+                analysis_model=effective_analysis_model,
                 same_model_for_analysis=stored_config.gemini.same_model_for_analysis,
                 text_thinking_level=stored_config.gemini.text_thinking_level,
                 has_api_key=bool(gemini_api_key),

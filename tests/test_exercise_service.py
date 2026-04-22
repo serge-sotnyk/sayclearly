@@ -218,6 +218,51 @@ def test_generate_text_uses_default_generation_settings_when_not_overridden(
     ]
 
 
+def test_generate_text_sanitizes_unsupported_stored_text_model(tmp_path: Path) -> None:
+    config = load_config(tmp_path)
+    save_config(
+        tmp_path,
+        config.model_copy(
+            update={
+                "gemini": config.gemini.model_copy(
+                    update={
+                        "text_model": "unsupported-hand-edited-model",
+                        "analysis_model": "unsupported-hand-edited-model",
+                    }
+                )
+            }
+        ),
+    )
+    secrets = load_secrets(tmp_path)
+    save_secrets(
+        tmp_path,
+        secrets.model_copy(
+            update={"gemini": secrets.gemini.model_copy(update={"api_key": "stored-key"})}
+        ),
+    )
+    client = FakeGeminiClient(
+        GeneratedExercise(text="Start slowly, then let the rhythm stay even.")
+    )
+    service = ExerciseService(tmp_path, gemini_client=client)
+
+    service.generate_text(
+        ExerciseGenerationRequest(
+            language="en",
+            analysis_language="uk",
+            topic_prompt="morning coffee routines",
+            reuse_last_topic=False,
+        )
+    )
+
+    assert client.calls == [
+        {
+            "prompt": client.calls[0]["prompt"],
+            "model": "gemini-3-flash-preview",
+            "thinking_level": "high",
+        }
+    ]
+
+
 def test_generate_text_requires_a_configured_gemini_api_key(tmp_path: Path) -> None:
     service = ExerciseService(tmp_path)
 

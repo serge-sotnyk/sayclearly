@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sayclearly.app import create_app
 from sayclearly.exercise.api import ExerciseRoute, build_exercise_router
 from sayclearly.exercise.service import (
+    ExerciseGenerationInvalidCredentialsError,
     ExerciseGenerationProviderError,
     ExerciseServiceConfigurationError,
 )
@@ -151,6 +152,26 @@ def test_post_generate_text_returns_calm_provider_error_without_raw_sdk_details(
     assert response.status_code == 502
     assert "provider" not in response.json()["detail"].lower()
     assert "meltdown" not in response.json()["detail"].lower()
+
+
+def test_post_generate_text_returns_clear_invalid_credentials_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "sayclearly.exercise.service.ExerciseService.generate_text",
+        lambda self, payload: (_ for _ in ()).throw(
+            ExerciseGenerationInvalidCredentialsError(
+                "Gemini API key was rejected. Update it and try again."
+            )
+        ),
+    )
+    client = TestClient(create_app(tmp_path))
+
+    response = client.post("/api/generate-text", json=make_payload())
+
+    assert response.status_code == 400
+    assert "rejected" in response.json()["detail"].lower()
+    assert "unavailable" not in response.json()["detail"].lower()
 
 
 def test_post_generate_text_returns_400_for_invalid_payload_shape(tmp_path: Path) -> None:

@@ -54,6 +54,22 @@ def get_supported_gemini_models() -> list[GeminiModelCatalogEntry]:
     return [entry.copy() for entry in SUPPORTED_GEMINI_MODELS]
 
 
+def is_supported_gemini_model(model: str) -> bool:
+    return model in {entry["id"] for entry in SUPPORTED_GEMINI_MODELS}
+
+
+def sanitize_text_model(model: str) -> str:
+    if is_supported_gemini_model(model):
+        return model
+    return get_default_text_model()
+
+
+def sanitize_analysis_model(model: str) -> str:
+    if is_supported_gemini_model(model):
+        return model
+    return get_default_analysis_model()
+
+
 def _get_non_empty_env(name: str) -> str | None:
     value = os.getenv(name)
     if value is None:
