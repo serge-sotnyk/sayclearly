@@ -1,6 +1,8 @@
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pathlib import Path
 
 import sayclearly.main as main_module
 from sayclearly.app import create_app
@@ -119,66 +121,63 @@ def test_main_registers_browser_open_on_app_startup(monkeypatch) -> None:
     assert startup_handler_counts == [1]
 
 
-def test_main_loads_dotenv_from_current_working_directory_before_creating_app(
-    monkeypatch,
+def test_main_does_not_load_parent_dotenv_when_cwd_has_no_env(
+    monkeypatch, tmp_path: Path
 ) -> None:
+    parent_dir = tmp_path / "parent"
+    cwd_dir = parent_dir / "cwd"
+    parent_dir.mkdir()
+    cwd_dir.mkdir()
+    (parent_dir / ".env").write_text("SAYCLEARLY_DOTENV_SCOPE=from-parent\n")
+
     calls: list[tuple[object, ...]] = []
-    dotenv_path = Path("C:/workspace/.env")
-
-    def fake_find_dotenv(*, filename: str, usecwd: bool) -> str:
-        calls.append(("find_dotenv", filename, usecwd))
-        return str(dotenv_path)
-
-    def fake_load_dotenv(*, dotenv_path: Path, override: bool) -> bool:
-        calls.append(("load_dotenv", dotenv_path, override))
-        return True
 
     def fake_create_app() -> FastAPI:
-        calls.append(("create_app",))
+        calls.append(("create_app", os.environ.get("SAYCLEARLY_DOTENV_SCOPE")))
         return FastAPI()
 
     def fake_run(app: object, host: str, port: int) -> None:
         calls.append(("run", host, port))
 
-    monkeypatch.setattr(main_module, "find_dotenv", fake_find_dotenv)
-    monkeypatch.setattr(main_module, "load_dotenv", fake_load_dotenv)
+    monkeypatch.delenv("SAYCLEARLY_DOTENV_SCOPE", raising=False)
+    monkeypatch.chdir(cwd_dir)
     monkeypatch.setattr(main_module, "create_app", fake_create_app)
     monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
 
     main_module.main()
 
-    assert calls[0] == ("find_dotenv", ".env", True)
-    assert calls[1] == ("load_dotenv", dotenv_path, False)
-    assert calls[2] == ("create_app",)
-
-
-def test_main_skips_dotenv_loading_when_no_cwd_env_file_exists(monkeypatch) -> None:
-    calls: list[tuple[object, ...]] = []
-
-    def fake_find_dotenv(*, filename: str, usecwd: bool) -> str:
-        calls.append(("find_dotenv", filename, usecwd))
-        return ""
-
-    def fake_load_dotenv(*, override: bool) -> bool:
-        calls.append(("load_dotenv", override))
-        return True
-
-    def fake_create_app() -> FastAPI:
-        calls.append(("create_app",))
-        return FastAPI()
-
-    def fake_run(app: object, host: str, port: int) -> None:
-        calls.append(("run", host, port))
-
-    monkeypatch.setattr(main_module, "find_dotenv", fake_find_dotenv)
-    monkeypatch.setattr(main_module, "load_dotenv", fake_load_dotenv)
-    monkeypatch.setattr(main_module, "create_app", fake_create_app)
-    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
-
-    main_module.main()
-
+    assert os.environ.get("SAYCLEARLY_DOTENV_SCOPE") is None
     assert calls == [
-        ("find_dotenv", ".env", True),
-        ("create_app",),
+        ("create_app", None),
+        ("run", main_module.HOST, main_module.PORT),
+    ]
+
+
+def test_main_loads_dotenv_from_exact_current_working_directory(
+    monkeypatch, tmp_path: Path
+) -> None:
+    cwd_dir = tmp_path / "cwd"
+    cwd_dir.mkdir()
+    (cwd_dir / ".env").write_text("SAYCLEARLY_DOTENV_SCOPE=from-cwd\n")
+
+    calls: list[tuple[object, ...]] = []
+
+    def fake_create_app() -> FastAPI:
+        calls.append(("create_app", os.environ.get("SAYCLEARLY_DOTENV_SCOPE")))
+        return FastAPI()
+
+    def fake_run(app: object, host: str, port: int) -> None:
+        calls.append(("run", host, port))
+
+    monkeypatch.delenv("SAYCLEARLY_DOTENV_SCOPE", raising=False)
+    monkeypatch.chdir(cwd_dir)
+    monkeypatch.setattr(main_module, "create_app", fake_create_app)
+    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
+
+    main_module.main()
+
+    assert os.environ["SAYCLEARLY_DOTENV_SCOPE"] == "from-cwd"
+    assert calls == [
+        ("create_app", "from-cwd"),
         ("run", main_module.HOST, main_module.PORT),
     ]
