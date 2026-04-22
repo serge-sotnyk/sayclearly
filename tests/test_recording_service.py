@@ -1,7 +1,9 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from sayclearly.recording.models import AudioAnalysisMetadata, RecordingAnalysisResponse
 from sayclearly.recording.service import (
     TEMP_RECORDINGS_DIR_NAME,
     EmptyRecordingError,
@@ -10,13 +12,31 @@ from sayclearly.recording.service import (
 from sayclearly.storage.files import CACHE_DIR_NAME
 
 
-def test_analyze_recording_saves_one_temp_file_and_returns_stub_review(tmp_path: Path) -> None:
+def test_analyze_recording_saves_temp_file_and_returns_review(tmp_path: Path) -> None:
     service = RecordingService(tmp_path)
+
+    fake_analysis = MagicMock()
+    fake_analysis.clarity_score = 72
+    fake_analysis.pace_score = 65
+    fake_analysis.hesitations = [{"start": 1.0, "end": 2.0, "note": "pause"}]
+    fake_analysis.summary = ["Tempo increased near the end."]
+    fake_analysis.recommendations = ["Slow down a little."]
+
+    fake_client = MagicMock()
+    fake_client.analyze_audio.return_value = fake_analysis
+    service._gemini_client = fake_client
+
+    metadata = AudioAnalysisMetadata(
+        language="uk",
+        analysis_language="uk",
+        exercise_text="The quick brown fox.",
+    )
 
     response = service.analyze_recording(
         audio_bytes=b"fake webm bytes",
         filename="sample.webm",
         content_type="audio/webm",
+        metadata=metadata,
     )
 
     temp_dir = tmp_path / CACHE_DIR_NAME / TEMP_RECORDINGS_DIR_NAME
@@ -24,25 +44,39 @@ def test_analyze_recording_saves_one_temp_file_and_returns_stub_review(tmp_path:
 
     assert len(saved_files) == 1
     assert saved_files[0].suffix == ".webm"
+    assert isinstance(response, RecordingAnalysisResponse)
     assert response.summary
     assert response.clarity
     assert response.pace
     assert response.hesitations
     assert response.recommendations
+    fake_client.analyze_audio.assert_called_once()
 
 
 def test_analyze_recording_keeps_only_newest_temp_file(tmp_path: Path) -> None:
     service = RecordingService(tmp_path)
+    fake_client = MagicMock()
+    fake_client.analyze_audio.return_value = MagicMock(
+        clarity_score=70,
+        pace_score=70,
+        hesitations=[],
+        summary=["Good."],
+        recommendations=["Keep practicing."],
+    )
+    service._gemini_client = fake_client
+    metadata = AudioAnalysisMetadata(language="uk", analysis_language="uk", exercise_text="Text.")
 
     service.analyze_recording(
         audio_bytes=b"first file",
-        filename="first.wav",
-        content_type="audio/wav",
+        filename="first.webm",
+        content_type="audio/webm",
+        metadata=metadata,
     )
     service.analyze_recording(
         audio_bytes=b"second file",
-        filename="second.wav",
-        content_type="audio/wav",
+        filename="second.webm",
+        content_type="audio/webm",
+        metadata=metadata,
     )
 
     temp_dir = tmp_path / CACHE_DIR_NAME / TEMP_RECORDINGS_DIR_NAME
@@ -54,10 +88,12 @@ def test_analyze_recording_keeps_only_newest_temp_file(tmp_path: Path) -> None:
 
 def test_analyze_recording_rejects_empty_upload(tmp_path: Path) -> None:
     service = RecordingService(tmp_path)
+    metadata = AudioAnalysisMetadata(language="uk", analysis_language="uk", exercise_text="Text.")
 
     with pytest.raises(EmptyRecordingError, match="empty"):
         service.analyze_recording(
             audio_bytes=b"",
             filename="empty.webm",
             content_type="audio/webm",
+            metadata=metadata,
         )
