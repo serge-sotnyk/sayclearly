@@ -145,6 +145,77 @@ def test_generate_text_uses_recent_history_and_configured_generation_settings(
     assert "Keep the rhythm steady while you speak." in client.calls[0]["prompt"]
 
 
+def test_generate_text_scopes_recent_history_to_request_language(tmp_path: Path) -> None:
+    secrets = load_secrets(tmp_path)
+    save_secrets(
+        tmp_path,
+        secrets.model_copy(
+            update={"gemini": secrets.gemini.model_copy(update={"api_key": "stored-key"})}
+        ),
+    )
+    history = load_history(tmp_path)
+    save_history(
+        tmp_path,
+        history.model_copy(
+            update={
+                "sessions": [
+                    make_history_session("01", "Read slowly and relax your jaw."),
+                    make_history_session("02", "Keep your shoulders loose while speaking.").model_copy(
+                        update={"language": "uk"}
+                    ),
+                ]
+            }
+        ),
+    )
+    client = FakeGeminiClient(GeneratedExercise(text="Start slowly, then let the rhythm stay even."))
+    service = ExerciseService(tmp_path, gemini_client=client)
+
+    service.generate_text(
+        ExerciseGenerationRequest(
+            language="en",
+            analysis_language="uk",
+            topic_prompt="morning coffee routines",
+            reuse_last_topic=False,
+        )
+    )
+
+    assert "Read slowly and relax your jaw." in client.calls[0]["prompt"]
+    assert "Keep your shoulders loose while speaking." not in client.calls[0]["prompt"]
+
+
+def test_generate_text_uses_default_generation_settings_when_not_overridden(
+    tmp_path: Path,
+) -> None:
+    secrets = load_secrets(tmp_path)
+    save_secrets(
+        tmp_path,
+        secrets.model_copy(
+            update={"gemini": secrets.gemini.model_copy(update={"api_key": "stored-key"})}
+        ),
+    )
+    client = FakeGeminiClient(
+        GeneratedExercise(text="Start slowly, then let the rhythm stay even.")
+    )
+    service = ExerciseService(tmp_path, gemini_client=client)
+
+    service.generate_text(
+        ExerciseGenerationRequest(
+            language="en",
+            analysis_language="uk",
+            topic_prompt="morning coffee routines",
+            reuse_last_topic=False,
+        )
+    )
+
+    assert client.calls == [
+        {
+            "prompt": client.calls[0]["prompt"],
+            "model": "gemini-3-flash",
+            "thinking_level": "high",
+        }
+    ]
+
+
 def test_generate_text_requires_a_configured_gemini_api_key(tmp_path: Path) -> None:
     service = ExerciseService(tmp_path)
 

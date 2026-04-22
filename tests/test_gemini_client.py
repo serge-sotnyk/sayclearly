@@ -50,6 +50,21 @@ def test_generate_exercise_parses_structured_json_and_uses_model_config() -> Non
     assert config.thinking_config.thinking_budget > 0
 
 
+def test_generate_exercise_uses_thinking_level_for_default_gemini_3_models() -> None:
+    sdk_client = FakeSdkClient(FakeResponse({"text": "Speak clearly and stay relaxed."}))
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
+
+    client.generate_exercise(
+        prompt="Generate a reading exercise.",
+        model="gemini-3-flash",
+        thinking_level="high",
+    )
+
+    config = sdk_client.models.calls[0]["config"]
+    assert config.thinking_config.thinking_level == "HIGH"
+    assert config.thinking_config.thinking_budget is None
+
+
 @pytest.mark.parametrize(
     "text",
     [

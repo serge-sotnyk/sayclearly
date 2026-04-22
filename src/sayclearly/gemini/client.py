@@ -11,6 +11,12 @@ _THINKING_BUDGETS: dict[ThinkingLevel, int] = {
     "high": 1024,
 }
 
+_THINKING_LEVELS: dict[ThinkingLevel, types.ThinkingLevel] = {
+    "low": types.ThinkingLevel.LOW,
+    "medium": types.ThinkingLevel.MEDIUM,
+    "high": types.ThinkingLevel.HIGH,
+}
+
 
 class GeminiClientError(RuntimeError):
     """Raised when Gemini text generation fails."""
@@ -76,8 +82,9 @@ class GeminiClient:
                     temperature=1,
                     response_mime_type="application/json",
                     response_schema=GeneratedExercise,
-                    thinking_config=types.ThinkingConfig(
-                        thinking_budget=_THINKING_BUDGETS[thinking_level]
+                    thinking_config=self._build_thinking_config(
+                        model=model,
+                        thinking_level=thinking_level,
                     ),
                 ),
             )
@@ -96,3 +103,14 @@ class GeminiClient:
 
         trace.record_success(exercise.text)
         return exercise
+
+    def _build_thinking_config(
+        self,
+        *,
+        model: str,
+        thinking_level: ThinkingLevel,
+    ) -> types.ThinkingConfig:
+        if model.startswith("gemini-3"):
+            return types.ThinkingConfig(thinking_level=_THINKING_LEVELS[thinking_level])
+
+        return types.ThinkingConfig(thinking_budget=_THINKING_BUDGETS[thinking_level])

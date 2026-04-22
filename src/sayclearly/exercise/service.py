@@ -45,7 +45,7 @@ class ExerciseService:
         generation_context = ExerciseGenerationContext(
             language=request.language,
             topic_prompt=topic_prompt,
-            recent_texts=self._load_recent_texts(),
+            recent_texts=self._load_recent_texts(request.language),
         )
         prompt = build_exercise_generation_prompt(
             language=generation_context.language,
@@ -109,11 +109,13 @@ class ExerciseService:
             return stored_api_key.strip()
         return None
 
-    def _load_recent_texts(self) -> list[str]:
+    def _load_recent_texts(self, language: str) -> list[str]:
         history = load_history(self.data_root)
         recent_texts: list[str] = []
 
         for session in history.sessions:
+            if session.language != language:
+                continue
             text = session.text.strip()
             if text:
                 recent_texts.append(text)
