@@ -72,7 +72,11 @@ class GeminiClient:
         model: str,
         thinking_level: ThinkingLevel,
     ) -> GeneratedExercise:
-        trace = self._telemetry.start_text_generation(model=model, thinking_level=thinking_level)
+        trace = self._telemetry.start_text_generation(
+            prompt=prompt,
+            model=model,
+            thinking_level=thinking_level,
+        )
 
         try:
             response = self._sdk_client.models.generate_content(

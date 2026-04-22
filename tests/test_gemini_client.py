@@ -5,6 +5,7 @@ from sayclearly.gemini.client import (
     GeminiMalformedResponseError,
     GeneratedExercise,
 )
+from sayclearly.gemini.telemetry import GeminiTelemetry
 
 
 class FakeModels:
@@ -27,6 +28,19 @@ class FakeSdkClient:
 class FakeResponse:
     def __init__(self, parsed) -> None:
         self.parsed = parsed
+
+
+class FailingObservation:
+    def update(self, **kwargs) -> None:
+        raise RuntimeError("telemetry update failed")
+
+    def end(self) -> None:
+        raise RuntimeError("telemetry end failed")
+
+
+class FailingLangfuse:
+    def start_observation(self, **kwargs) -> FailingObservation:
+        return FailingObservation()
 
 
 def test_generate_exercise_parses_structured_json_and_uses_model_config() -> None:
@@ -83,3 +97,20 @@ def test_generate_exercise_rejects_clearly_malformed_model_output(text: str) -> 
             model="gemini-2.5-flash",
             thinking_level="low",
         )
+
+
+def test_generate_exercise_succeeds_when_telemetry_update_fails(monkeypatch) -> None:
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "public-key")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "secret-key")
+    monkeypatch.setenv("LANGFUSE_HOST", "https://langfuse.example")
+    sdk_client = FakeSdkClient(FakeResponse({"text": "Speak clearly and stay relaxed."}))
+    telemetry = GeminiTelemetry(langfuse_factory=lambda **_: FailingLangfuse())
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client, telemetry=telemetry)
+
+    exercise = client.generate_exercise(
+        prompt="Generate a reading exercise.",
+        model="gemini-2.5-flash",
+        thinking_level="medium",
+    )
+
+    assert exercise == GeneratedExercise(text="Speak clearly and stay relaxed.")
