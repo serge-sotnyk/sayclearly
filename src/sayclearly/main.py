@@ -2,8 +2,10 @@
 
 import logging
 import webbrowser
+from pathlib import Path
 
 import uvicorn
+from dotenv import load_dotenv
 
 from sayclearly.app import create_app
 
@@ -12,6 +14,9 @@ PORT = 8008
 
 
 def main() -> None:
+    dotenv_path = Path.cwd() / ".env"
+    if dotenv_path.is_file():
+        load_dotenv(dotenv_path=dotenv_path, override=False)
     app = create_app()
     url = f"http://{HOST}:{PORT}/"
 

@@ -40,6 +40,30 @@
             </label>
 
             <label class="field">
+              <span>Text generation model</span>
+              <select name="text-model" data-text-model-select></select>
+            </label>
+
+            <label class="field">
+              <span>Analysis model</span>
+              <select name="analysis-model" data-analysis-model-select></select>
+            </label>
+
+            <label class="toggle-field">
+              <input type="checkbox" name="same-model" data-same-model-toggle />
+              <span>Use the same model for analysis</span>
+            </label>
+
+            <label class="field">
+              <span>Thinking level</span>
+              <select name="thinking-level" data-thinking-level-select>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+
+            <label class="field">
               <span>Text language</span>
               <input type="text" name="text-language" value="English" data-text-language-input />
             </label>

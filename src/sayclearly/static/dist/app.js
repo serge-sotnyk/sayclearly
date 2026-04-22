@@ -1,4 +1,4 @@
-import { advanceExerciseStep, applyAnalysisError, applyAnalysisResult, applyGeneratedExercise, applyGenerationError, applyLoadedConfig, applyRecordingError, buildConfigUpdatePayload, buildGenerateRequest, createInitialAppModel, markRecordingStarted, resetRecording, startRecordingAnalysis, startRecordingRequest, startGeneration, storeRecordedAudio, syncAnalysisLanguage, } from './app_state.js';
+import { advanceExerciseStep, applyAnalysisError, applyAnalysisResult, applyGeneratedExercise, applyGenerationError, applyLoadedConfig, applyRecordingError, buildConfigUpdatePayload, buildGenerateRequest, createInitialAppModel, markRecordingStarted, resetRecording, startRecordingAnalysis, startRecordingRequest, startGeneration, storeRecordedAudio, syncAnalysisModel, syncAnalysisLanguage, } from './app_state.js';
 const READY_STATUS = 'Ready to generate a guided exercise.';
 const LOADING_STATUS = 'Loading your saved settings...';
 const GENERATING_STATUS = 'Generating your guided exercise...';
@@ -30,6 +30,14 @@ const STEP_CONTENT = {
         nextButtonDisabled: true,
     },
 };
+class RequestError extends Error {
+    detail;
+    constructor(message, detail = null) {
+        super(message);
+        this.name = 'RequestError';
+        this.detail = detail;
+    }
+}
 function createDefaultRecordingApi() {
     return {
         isSupported() {
@@ -69,6 +77,10 @@ function collectShellElements(root) {
         settingsStatus: getRequiredElement(root, '[data-settings-status]'),
         clearApiKeyButton: getRequiredElement(root, '[data-clear-api-key-button]'),
         apiKeyInput: getRequiredElement(root, '[data-api-key-input]'),
+        textModelSelect: getRequiredElement(root, '[data-text-model-select]'),
+        analysisModelSelect: getRequiredElement(root, '[data-analysis-model-select]'),
+        sameModelToggle: getRequiredElement(root, '[data-same-model-toggle]'),
+        thinkingLevelSelect: getRequiredElement(root, '[data-thinking-level-select]'),
         textLanguageInput: getRequiredElement(root, '[data-text-language-input]'),
         analysisLanguageInput: getRequiredElement(root, '[data-analysis-language-input]'),
         sameLanguageToggle: getRequiredElement(root, '[data-same-language-toggle]'),
@@ -96,6 +108,21 @@ function collectShellElements(root) {
         exerciseText: getRequiredElement(root, '[data-exercise-text]'),
     };
 }
+function formatModelLabel(model) {
+    if (model.free_tier_requests_per_day_hint === null) {
+        return model.label;
+    }
+    return `${model.label} (${model.free_tier_requests_per_day_hint} RPD hint)`;
+}
+function renderModelOptions(documentRef, select, models) {
+    const options = models.map((model) => {
+        const option = documentRef.createElement('option');
+        option.value = model.id;
+        option.textContent = formatModelLabel(model);
+        return option;
+    });
+    select.replaceChildren(...options);
+}
 function getSettingsStatus(config) {
     if (config.gemini.has_api_key) {
         if (config.gemini.api_key_source === 'env') {
@@ -121,13 +148,17 @@ function getStatusMessage(model, reuseNextGeneration) {
     return READY_STATUS;
 }
 function readSettings(elements, reuseLastTopic) {
-    return syncAnalysisLanguage({
+    return syncAnalysisModel(syncAnalysisLanguage({
         text_language: elements.textLanguageInput.value.trim(),
         analysis_language: elements.analysisLanguageInput.value.trim(),
         same_language_for_analysis: elements.sameLanguageToggle.checked,
+        text_model: elements.textModelSelect.value,
+        analysis_model: elements.analysisModelSelect.value,
+        same_model_for_analysis: elements.sameModelToggle.checked,
+        text_thinking_level: elements.thinkingLevelSelect.value,
         topic_prompt: elements.topicInput.value.trim(),
         reuse_last_topic: reuseLastTopic,
-    });
+    }));
 }
 function buildConfigRequest(config, settings, apiKeyValue) {
     const nextConfig = buildConfigUpdatePayload(config, settings);
@@ -135,7 +166,7 @@ function buildConfigRequest(config, settings, apiKeyValue) {
     return {
         ...nextConfig,
         gemini: {
-            model: nextConfig.gemini.model,
+            ...nextConfig.gemini,
             api_key: trimmedApiKey === '' ? null : trimmedApiKey,
         },
     };
@@ -152,11 +183,31 @@ async function requestJson(fetchImpl, url, options) {
         headers,
     });
     if (!response.ok) {
-        throw new Error(`Request failed: ${url}`);
+        let detail = null;
+        try {
+            const body = (await response.json());
+            if (typeof body.detail === 'string' && body.detail.trim() !== '') {
+                detail = body.detail;
+            }
+        }
+        catch {
+            detail = null;
+        }
+        throw new RequestError(`Request failed: ${url}`, detail);
     }
     return (await response.json());
 }
-function render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl) {
+function getRequestErrorMessage(error, fallback) {
+    return error instanceof RequestError && error.detail !== null ? error.detail : fallback;
+}
+function render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl) {
+    renderModelOptions(documentRef, elements.textModelSelect, model.config.gemini.available_models);
+    renderModelOptions(documentRef, elements.analysisModelSelect, model.config.gemini.available_models);
+    elements.textModelSelect.value = model.settings.text_model;
+    elements.analysisModelSelect.value = model.settings.analysis_model;
+    elements.sameModelToggle.checked = model.settings.same_model_for_analysis;
+    elements.thinkingLevelSelect.value = model.settings.text_thinking_level;
+    elements.analysisModelSelect.disabled = model.settings.same_model_for_analysis;
     elements.textLanguageInput.value = model.settings.text_language;
     elements.analysisLanguageInput.value = model.settings.analysis_language;
     elements.sameLanguageToggle.checked = model.settings.same_language_for_analysis;
@@ -245,6 +296,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     let model = createInitialAppModel();
     let isSettingsOpen = false;
     let reuseNextGeneration = false;
+    let hasLoadedConfig = false;
     let activeRecorder = null;
     let activeStream = null;
     let activeRecorderToken = 0;
@@ -274,23 +326,35 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             ...model,
             settings: nextSettings,
         };
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     };
     const refreshFromInputs = () => {
         updateSettings(readSettings(elements, reuseNextGeneration));
     };
     elements.openSettingsButton.addEventListener('click', () => {
         isSettingsOpen = true;
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.closeSettingsButton.addEventListener('click', () => {
         isSettingsOpen = false;
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.textLanguageInput.addEventListener('input', () => {
         refreshFromInputs();
     });
     elements.analysisLanguageInput.addEventListener('input', () => {
+        refreshFromInputs();
+    });
+    elements.textModelSelect.addEventListener('change', () => {
+        refreshFromInputs();
+    });
+    elements.analysisModelSelect.addEventListener('change', () => {
+        refreshFromInputs();
+    });
+    elements.sameModelToggle.addEventListener('change', () => {
+        refreshFromInputs();
+    });
+    elements.thinkingLevelSelect.addEventListener('change', () => {
         refreshFromInputs();
     });
     elements.sameLanguageToggle.addEventListener('change', () => {
@@ -308,16 +372,16 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     });
     elements.nextStepButton.addEventListener('click', () => {
         model = advanceExerciseStep(model);
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.startRecordingButton.addEventListener('click', async () => {
         if (!recordingApi.isSupported()) {
             model = applyRecordingError(model, 'This browser does not support microphone recording.');
-            render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
             return;
         }
         model = startRecordingRequest(model);
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
         const recorderToken = activeRecorderToken + 1;
         activeRecorderToken = recorderToken;
         try {
@@ -348,7 +412,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                 if (blob.size === 0) {
                     clearRecordingArtifacts();
                     model = applyRecordingError(model, 'No recording was captured. Please try again.');
-                    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+                    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
                     return;
                 }
                 if (recordedUrl !== null) {
@@ -357,7 +421,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                 recordedBlob = blob;
                 recordedUrl = recordingApi.createObjectURL(blob);
                 model = storeRecordedAudio(model);
-                render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+                render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
             });
             recorder.start();
             model = markRecordingStarted(model);
@@ -370,7 +434,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             stopActiveStream();
             model = applyRecordingError(model, 'Microphone access was unavailable. Please try again.');
         }
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.stopRecordingButton.addEventListener('click', () => {
         activeRecorder?.stop();
@@ -378,11 +442,11 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     elements.analyzeRecordingButton.addEventListener('click', async () => {
         if (recordedBlob === null) {
             model = applyRecordingError(model, 'No recording was captured. Please try again.');
-            render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
             return;
         }
         model = startRecordingAnalysis(model);
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
         try {
             const formData = new FormData();
             formData.append('audio', recordedBlob, 'retelling.webm');
@@ -395,32 +459,36 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
         catch {
             model = applyAnalysisError(model, 'Could not upload the recording. Try again.');
         }
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.recordAgainButton.addEventListener('click', () => {
         clearRecordingArtifacts();
         model = resetRecording(model);
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.resetButton.addEventListener('click', () => {
         reuseNextGeneration = false;
         clearRecordingArtifacts();
         const resetModel = createInitialAppModel();
         model = applyLoadedConfig(resetModel, model.config);
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     elements.clearApiKeyButton.addEventListener('click', async () => {
         try {
             const config = await requestJson(fetchImpl, '/api/config/api-key', {
                 method: 'DELETE',
             });
-            model = applyLoadedConfig(model, config);
+            model = {
+                ...model,
+                config,
+            };
+            hasLoadedConfig = true;
             model = {
                 ...model,
                 error_message: null,
             };
             elements.apiKeyInput.value = '';
-            render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
         }
         catch {
             elements.settingsStatus.textContent = CLEAR_ERROR_STATUS;
@@ -433,13 +501,34 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             settings,
         };
         model = startGeneration(model);
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
         try {
+            let configForSave = model.config;
+            if (!hasLoadedConfig) {
+                try {
+                    configForSave = await requestJson(fetchImpl, '/api/config', {
+                        method: 'GET',
+                    });
+                    model = {
+                        ...applyLoadedConfig(model, configForSave),
+                        settings,
+                    };
+                    hasLoadedConfig = true;
+                }
+                catch (error) {
+                    throw new RequestError('Request failed: /api/config', getRequestErrorMessage(error, LOAD_ERROR_STATUS));
+                }
+            }
             const savedConfig = await requestJson(fetchImpl, '/api/config', {
                 method: 'POST',
-                body: JSON.stringify(buildConfigRequest(model.config, settings, elements.apiKeyInput.value)),
+                body: JSON.stringify(buildConfigRequest(configForSave, settings, elements.apiKeyInput.value)),
             });
-            model = applyLoadedConfig(model, savedConfig);
+            hasLoadedConfig = true;
+            model = {
+                ...model,
+                config: savedConfig,
+                settings,
+            };
             const exercise = await requestJson(fetchImpl, '/api/generate-text', {
                 method: 'POST',
                 body: JSON.stringify(buildGenerateRequest(settings)),
@@ -447,35 +536,36 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             reuseNextGeneration = false;
             model = applyGeneratedExercise(model, exercise);
         }
-        catch {
+        catch (error) {
             reuseNextGeneration = false;
-            model = applyGenerationError(model, GENERATE_ERROR_STATUS);
+            model = applyGenerationError(model, getRequestErrorMessage(error, GENERATE_ERROR_STATUS));
         }
-        render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
     model = {
         ...model,
         error_message: LOADING_STATUS,
     };
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     try {
         const config = await requestJson(fetchImpl, '/api/config', {
             method: 'GET',
         });
         model = applyLoadedConfig(model, config);
+        hasLoadedConfig = true;
         model = {
             ...model,
             error_message: null,
         };
     }
-    catch {
-        model = applyGenerationError(model, LOAD_ERROR_STATUS);
+    catch (error) {
+        model = applyGenerationError(model, getRequestErrorMessage(error, LOAD_ERROR_STATUS));
         model = {
             ...model,
             flow: 'home',
         };
     }
-    render(elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
 }
 if (typeof document !== 'undefined' && typeof fetch !== 'undefined') {
     void startApp();

@@ -16,6 +16,10 @@ def test_home_page_renders_stage_3_shell() -> None:
     assert "data-status-message" in response.text
     assert "data-open-settings-button" in response.text
     assert "data-api-key-input" in response.text
+    assert "data-text-model-select" in response.text
+    assert "data-analysis-model-select" in response.text
+    assert "data-same-model-toggle" in response.text
+    assert "data-thinking-level-select" in response.text
     assert "data-topic-input" in response.text
     assert "data-generate-button" in response.text
     assert "data-step-label" in response.text
@@ -27,6 +31,18 @@ def test_home_page_renders_stage_3_shell() -> None:
     assert "data-clear-api-key-button" in response.text
     assert "data-close-settings-button" in response.text
     assert "/static/dist/app.js" in response.text
+
+
+def test_home_page_renders_stage_5_model_controls() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Text generation model" in response.text
+    assert "Analysis model" in response.text
+    assert "Use the same model for analysis" in response.text
+    assert "Thinking level" in response.text
 
 
 def test_home_page_renders_stage_4_recording_hooks() -> None:

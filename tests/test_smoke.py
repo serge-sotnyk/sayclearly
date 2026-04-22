@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -116,3 +119,63 @@ def test_main_registers_browser_open_on_app_startup(monkeypatch) -> None:
 
     assert opened_urls == []
     assert startup_handler_counts == [1]
+
+
+def test_main_does_not_load_parent_dotenv_when_cwd_has_no_env(monkeypatch, tmp_path: Path) -> None:
+    parent_dir = tmp_path / "parent"
+    cwd_dir = parent_dir / "cwd"
+    parent_dir.mkdir()
+    cwd_dir.mkdir()
+    (parent_dir / ".env").write_text("SAYCLEARLY_DOTENV_SCOPE=from-parent\n")
+
+    calls: list[tuple[object, ...]] = []
+
+    def fake_create_app() -> FastAPI:
+        calls.append(("create_app", os.environ.get("SAYCLEARLY_DOTENV_SCOPE")))
+        return FastAPI()
+
+    def fake_run(app: object, host: str, port: int) -> None:
+        calls.append(("run", host, port))
+
+    monkeypatch.delenv("SAYCLEARLY_DOTENV_SCOPE", raising=False)
+    monkeypatch.chdir(cwd_dir)
+    monkeypatch.setattr(main_module, "create_app", fake_create_app)
+    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
+
+    main_module.main()
+
+    assert os.environ.get("SAYCLEARLY_DOTENV_SCOPE") is None
+    assert calls == [
+        ("create_app", None),
+        ("run", main_module.HOST, main_module.PORT),
+    ]
+
+
+def test_main_loads_dotenv_from_exact_current_working_directory(
+    monkeypatch, tmp_path: Path
+) -> None:
+    cwd_dir = tmp_path / "cwd"
+    cwd_dir.mkdir()
+    (cwd_dir / ".env").write_text("SAYCLEARLY_DOTENV_SCOPE=from-cwd\n")
+
+    calls: list[tuple[object, ...]] = []
+
+    def fake_create_app() -> FastAPI:
+        calls.append(("create_app", os.environ.get("SAYCLEARLY_DOTENV_SCOPE")))
+        return FastAPI()
+
+    def fake_run(app: object, host: str, port: int) -> None:
+        calls.append(("run", host, port))
+
+    monkeypatch.delenv("SAYCLEARLY_DOTENV_SCOPE", raising=False)
+    monkeypatch.chdir(cwd_dir)
+    monkeypatch.setattr(main_module, "create_app", fake_create_app)
+    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
+
+    main_module.main()
+
+    assert os.environ["SAYCLEARLY_DOTENV_SCOPE"] == "from-cwd"
+    assert calls == [
+        ("create_app", "from-cwd"),
+        ("run", main_module.HOST, main_module.PORT),
+    ]

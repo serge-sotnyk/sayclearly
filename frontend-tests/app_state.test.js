@@ -30,9 +30,30 @@ const publicConfig = {
   session_limit: 8,
   keep_last_audio: true,
   gemini: {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-flash-preview',
+    text_model: 'gemini-3-flash-preview',
+    analysis_model: 'gemini-3.1-flash-lite-preview',
+    same_model_for_analysis: false,
+    text_thinking_level: 'medium',
     has_api_key: true,
     api_key_source: 'stored',
+    available_models: [
+      {
+        id: 'gemini-3-flash-preview',
+        label: 'Gemini 3 Flash',
+        free_tier_requests_per_day_hint: null,
+      },
+      {
+        id: 'gemini-2.5-flash',
+        label: 'Gemini 2.5 Flash',
+        free_tier_requests_per_day_hint: 250,
+      },
+      {
+        id: 'gemini-2.5-flash-lite',
+        label: 'Gemini 2.5 Flash-Lite',
+        free_tier_requests_per_day_hint: 1000,
+      },
+    ],
   },
   langfuse: {
     host: 'https://langfuse.example',
@@ -70,6 +91,10 @@ test('syncAnalysisLanguage copies text language when toggle is enabled', () => {
     text_language: 'pl',
     analysis_language: 'uk',
     same_language_for_analysis: true,
+    text_model: 'gemini-3-flash-preview',
+    analysis_model: 'gemini-3.1-flash-lite-preview',
+    same_model_for_analysis: false,
+    text_thinking_level: 'medium',
     topic_prompt: 'A short weather forecast',
     reuse_last_topic: false,
   };
@@ -133,6 +158,10 @@ test('buildGenerateRequest and buildConfigUpdatePayload preserve current config 
     text_language: 'pl',
     analysis_language: 'pl',
     same_language_for_analysis: true,
+    text_model: 'gemini-3-flash-preview',
+    analysis_model: 'gemini-3.1-flash-lite-preview',
+    same_model_for_analysis: false,
+    text_thinking_level: 'medium',
     topic_prompt: 'Describe a quiet library',
     reuse_last_topic: true,
   };
@@ -153,7 +182,10 @@ test('buildGenerateRequest and buildConfigUpdatePayload preserve current config 
     session_limit: 8,
     keep_last_audio: true,
     gemini: {
-      model: 'gemini-2.5-flash',
+      text_model: 'gemini-3-flash-preview',
+      analysis_model: 'gemini-3.1-flash-lite-preview',
+      same_model_for_analysis: false,
+      text_thinking_level: 'medium',
       api_key: null,
     },
     langfuse: {
@@ -169,6 +201,10 @@ test('buildConfigUpdatePayload preserves stored last_topic_prompt when reusing a
     text_language: 'pl',
     analysis_language: 'en',
     same_language_for_analysis: false,
+    text_model: 'gemini-3-flash-preview',
+    analysis_model: 'gemini-3.1-flash-lite-preview',
+    same_model_for_analysis: false,
+    text_thinking_level: 'medium',
     topic_prompt: '',
     reuse_last_topic: true,
   };
@@ -182,7 +218,10 @@ test('buildConfigUpdatePayload preserves stored last_topic_prompt when reusing a
     session_limit: 8,
     keep_last_audio: true,
     gemini: {
-      model: 'gemini-2.5-flash',
+      text_model: 'gemini-3-flash-preview',
+      analysis_model: 'gemini-3.1-flash-lite-preview',
+      same_model_for_analysis: false,
+      text_thinking_level: 'medium',
       api_key: null,
     },
     langfuse: {
@@ -190,6 +229,38 @@ test('buildConfigUpdatePayload preserves stored last_topic_prompt when reusing a
       public_key: null,
       secret_key: null,
     },
+  });
+});
+
+test('buildConfigUpdatePayload keeps analysis model aligned when same model is enabled', () => {
+  const settings = {
+    text_language: 'uk',
+    analysis_language: 'en',
+    same_language_for_analysis: false,
+    text_model: 'gemini-2.5-flash',
+    analysis_model: 'gemini-3.1-flash-lite-preview',
+    same_model_for_analysis: true,
+    text_thinking_level: 'medium',
+    topic_prompt: 'Describe a market square',
+    reuse_last_topic: false,
+  };
+
+  const config = {
+    ...publicConfig,
+    gemini: {
+      ...publicConfig.gemini,
+      text_model: 'gemini-2.5-flash',
+      analysis_model: 'gemini-3.1-flash-lite-preview',
+      same_model_for_analysis: true,
+    },
+  };
+
+  assert.deepEqual(buildConfigUpdatePayload(config, settings).gemini, {
+    text_model: 'gemini-2.5-flash',
+    analysis_model: 'gemini-2.5-flash',
+    same_model_for_analysis: true,
+    text_thinking_level: 'medium',
+    api_key: null,
   });
 });
 

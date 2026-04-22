@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from sayclearly.app import create_app
@@ -14,7 +15,13 @@ def make_payload() -> dict[str, object]:
         "last_topic_prompt": "interesting facts about astronomy",
         "session_limit": 250,
         "keep_last_audio": False,
-        "gemini": {"model": "gemini-2.5-flash", "api_key": "stored-gemini"},
+        "gemini": {
+            "text_model": "gemini-3-flash-preview",
+            "analysis_model": "gemini-3.1-flash-lite-preview",
+            "same_model_for_analysis": False,
+            "text_thinking_level": "medium",
+            "api_key": "stored-gemini",
+        },
         "langfuse": {
             "host": "https://langfuse.example",
             "public_key": "stored-public",
@@ -30,9 +37,14 @@ def test_get_config_returns_public_contract(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json()["gemini"] == {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-3-flash-preview",
+        "text_model": "gemini-3-flash-preview",
+        "analysis_model": "gemini-3-flash-preview",
+        "same_model_for_analysis": True,
+        "text_thinking_level": "high",
         "has_api_key": False,
         "api_key_source": "none",
+        "available_models": response.json()["gemini"]["available_models"],
     }
 
 
@@ -48,6 +60,8 @@ def test_post_config_persists_changes_across_app_recreation(tmp_path: Path) -> N
     assert get_response.json()["text_language"] == "en"
     assert get_response.json()["gemini"]["has_api_key"] is True
     assert get_response.json()["gemini"]["api_key_source"] == "stored"
+    assert get_response.json()["gemini"]["text_model"] == "gemini-3-flash-preview"
+    assert get_response.json()["gemini"]["analysis_model"] == "gemini-3.1-flash-lite-preview"
 
 
 def test_delete_api_key_clears_only_the_stored_value(tmp_path: Path, monkeypatch) -> None:
@@ -81,3 +95,41 @@ def test_post_config_returns_422_for_semantically_invalid_payload(tmp_path: Path
     response = client.post("/api/config", json=payload)
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("text_model", "gemini-1.5-pro"),
+        ("analysis_model", "custom-hand-edited-model"),
+    ],
+)
+def test_post_config_rejects_unsupported_gemini_models(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    client = TestClient(create_app(tmp_path))
+    payload = make_payload()
+    payload["gemini"][field] = value
+
+    response = client.post("/api/config", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_post_config_accepts_legacy_gemini_model_payload(tmp_path: Path) -> None:
+    client = TestClient(create_app(tmp_path))
+    payload = make_payload()
+    payload["gemini"] = {
+        "model": "gemini-3.1-flash-lite-preview",
+        "api_key": None,
+    }
+
+    response = client.post("/api/config", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["gemini"]["model"] == "gemini-3.1-flash-lite-preview"
+    assert response.json()["gemini"]["text_model"] == "gemini-3.1-flash-lite-preview"
+    assert response.json()["gemini"]["analysis_model"] == "gemini-3.1-flash-lite-preview"
+    assert response.json()["gemini"]["same_model_for_analysis"] is True

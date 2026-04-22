@@ -4,11 +4,21 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from sayclearly.gemini.catalog import (
+    PRODUCT_DEFAULT_TEXT_THINKING_LEVEL,
+    ThinkingLevel,
+    get_default_analysis_model,
+    get_default_text_model,
+)
+
 
 class GeminiConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    model: str = "gemini-2.5-flash"
+    text_model: str = Field(default_factory=get_default_text_model)
+    analysis_model: str = Field(default_factory=get_default_analysis_model)
+    same_model_for_analysis: bool = True
+    text_thinking_level: ThinkingLevel = PRODUCT_DEFAULT_TEXT_THINKING_LEVEL
 
 
 class LangfuseConfig(BaseModel):
@@ -20,7 +30,7 @@ class LangfuseConfig(BaseModel):
 class StoredConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: Literal[1] = 1
+    version: Literal[2] = 2
     text_language: str = "uk"
     analysis_language: str = "uk"
     ui_language: str = "en"

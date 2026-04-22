@@ -9,6 +9,16 @@ from sayclearly.config.models import (
     LangfusePublicConfig,
     PublicConfigView,
 )
+from sayclearly.gemini.catalog import (
+    PRODUCT_DEFAULT_ANALYSIS_MODEL,
+    PRODUCT_DEFAULT_TEXT_MODEL,
+    get_default_analysis_model,
+    get_default_text_model,
+    get_supported_gemini_models,
+    is_supported_gemini_model,
+    sanitize_analysis_model,
+    sanitize_text_model,
+)
 from sayclearly.storage.files import load_config, load_secrets, save_config, save_secrets
 
 
@@ -19,6 +29,10 @@ class ConfigService:
     def get_public_config(self) -> PublicConfigView:
         stored_config = load_config(self.data_root)
         stored_secrets = load_secrets(self.data_root)
+        effective_text_model = self._resolve_effective_text_model(stored_config.gemini.text_model)
+        effective_analysis_model = self._resolve_effective_analysis_model(
+            stored_config.gemini.analysis_model
+        )
 
         gemini_api_key, gemini_source = self._resolve_secret(
             env_name="GEMINI_API_KEY",
@@ -47,13 +61,17 @@ class ConfigService:
             session_limit=stored_config.session_limit,
             keep_last_audio=stored_config.keep_last_audio,
             gemini=GeminiPublicConfig(
-                model=stored_config.gemini.model,
+                text_model=effective_text_model,
+                analysis_model=effective_analysis_model,
+                same_model_for_analysis=stored_config.gemini.same_model_for_analysis,
+                text_thinking_level=stored_config.gemini.text_thinking_level,
                 has_api_key=bool(gemini_api_key),
                 api_key_source=gemini_source,
+                available_models=get_supported_gemini_models(),
             ),
             langfuse=LangfusePublicConfig(
                 host=langfuse_host,
-                enabled=bool(langfuse_host and langfuse_public_key and langfuse_secret_key),
+                enabled=self._is_langfuse_runtime_enabled(),
                 has_public_key=bool(langfuse_public_key),
                 has_secret_key=bool(langfuse_secret_key),
                 public_key_source=public_key_source,
@@ -73,7 +91,10 @@ class ConfigService:
         stored_config.last_topic_prompt = payload.last_topic_prompt
         stored_config.session_limit = payload.session_limit
         stored_config.keep_last_audio = payload.keep_last_audio
-        stored_config.gemini.model = payload.gemini.model
+        stored_config.gemini.text_model = payload.gemini.text_model
+        stored_config.gemini.analysis_model = payload.gemini.analysis_model
+        stored_config.gemini.same_model_for_analysis = payload.gemini.same_model_for_analysis
+        stored_config.gemini.text_thinking_level = payload.gemini.text_thinking_level
         stored_config.langfuse.host = payload.langfuse.host
 
         if payload.gemini.api_key is not None:
@@ -110,6 +131,24 @@ class ConfigService:
             return stored_value, "stored"
         return None, "none"
 
+    def _resolve_effective_text_model(self, stored_model: str) -> str:
+        if stored_model != PRODUCT_DEFAULT_TEXT_MODEL:
+            return sanitize_text_model(stored_model)
+
+        env_default = get_default_text_model()
+        if is_supported_gemini_model(env_default):
+            return env_default
+        return PRODUCT_DEFAULT_TEXT_MODEL
+
+    def _resolve_effective_analysis_model(self, stored_model: str) -> str:
+        if stored_model != PRODUCT_DEFAULT_ANALYSIS_MODEL:
+            return sanitize_analysis_model(stored_model)
+
+        env_default = get_default_analysis_model()
+        if is_supported_gemini_model(env_default):
+            return env_default
+        return PRODUCT_DEFAULT_ANALYSIS_MODEL
+
     def _resolve_value(
         self,
         *,
@@ -128,5 +167,12 @@ class ConfigService:
         if env_value is None:
             return None
         if env_value.strip() == "":
-            return ""
+            return None
         return env_value
+
+    def _is_langfuse_runtime_enabled(self) -> bool:
+        return bool(
+            self._get_env_override("LANGFUSE_HOST")
+            and self._get_env_override("LANGFUSE_PUBLIC_KEY")
+            and self._get_env_override("LANGFUSE_SECRET_KEY")
+        )

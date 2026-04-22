@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExerciseGenerationRequest(BaseModel):
@@ -17,3 +17,11 @@ class ExerciseGenerationResponse(BaseModel):
     analysis_language: str
     topic_prompt: str
     text: str
+
+
+class ExerciseGenerationContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    language: str
+    topic_prompt: str
+    recent_texts: list[str] = Field(default_factory=list)

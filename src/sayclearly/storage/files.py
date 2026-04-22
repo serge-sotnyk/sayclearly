@@ -2,9 +2,15 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from sayclearly.gemini.catalog import (
+    PRODUCT_DEFAULT_ANALYSIS_MODEL,
+    PRODUCT_DEFAULT_TEXT_MODEL,
+    PRODUCT_DEFAULT_TEXT_THINKING_LEVEL,
+)
 from sayclearly.storage.models import HistoryStore, StoredConfig, StoredSecrets
 
 APP_DIR_NAME = ".sayclearly"
@@ -31,7 +37,7 @@ def ensure_storage_root(data_root: Path | None = None) -> Path:
     except OSError as exc:
         raise StorageError(f"Could not create storage root at {root}") from exc
 
-    _ensure_default_file(root / CONFIG_FILE_NAME, StoredConfig())
+    _ensure_default_file(root / CONFIG_FILE_NAME, _build_product_default_config())
     _ensure_default_file(root / SECRETS_FILE_NAME, StoredSecrets())
     _ensure_default_file(root / HISTORY_FILE_NAME, HistoryStore())
     return root
@@ -64,6 +70,28 @@ def _ensure_default_file(path: Path, model: BaseModel) -> None:
     atomic_write_json(path, model.model_dump(mode="json", exclude_none=True))
 
 
+def _build_product_default_config() -> StoredConfig:
+    return StoredConfig.model_validate(
+        {
+            "version": 2,
+            "text_language": "uk",
+            "analysis_language": "uk",
+            "ui_language": "en",
+            "same_language_for_analysis": True,
+            "last_topic_prompt": "",
+            "session_limit": 300,
+            "keep_last_audio": False,
+            "gemini": {
+                "text_model": PRODUCT_DEFAULT_TEXT_MODEL,
+                "analysis_model": PRODUCT_DEFAULT_ANALYSIS_MODEL,
+                "same_model_for_analysis": True,
+                "text_thinking_level": PRODUCT_DEFAULT_TEXT_THINKING_LEVEL,
+            },
+            "langfuse": {},
+        }
+    )
+
+
 def _load_model[ModelT: BaseModel](
     path: Path,
     model_type: type[ModelT],
@@ -90,7 +118,26 @@ def _load_model[ModelT: BaseModel](
 
 def load_config(data_root: Path | None = None) -> StoredConfig:
     root = ensure_storage_root(data_root)
-    return _load_model(root / CONFIG_FILE_NAME, StoredConfig, StoredConfig())
+    path = root / CONFIG_FILE_NAME
+    default_config = StoredConfig()
+
+    if not path.exists():
+        product_default_config = _build_product_default_config()
+        atomic_write_json(path, product_default_config.model_dump(mode="json", exclude_none=True))
+        return product_default_config
+
+    payload = _load_json_payload(path)
+    migrated_payload = _migrate_config_payload(payload, default_config)
+
+    try:
+        config = StoredConfig.model_validate(migrated_payload)
+    except ValidationError as exc:
+        raise StorageError(f"Invalid data in {path}") from exc
+
+    if migrated_payload != payload:
+        atomic_write_json(path, config.model_dump(mode="json", exclude_none=True))
+
+    return config
 
 
 def save_config(data_root: Path | None, config: StoredConfig) -> None:
@@ -99,6 +146,41 @@ def save_config(data_root: Path | None, config: StoredConfig) -> None:
         root / CONFIG_FILE_NAME,
         config.model_dump(mode="json", exclude_none=True),
     )
+
+
+def _load_json_payload(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise StorageError(f"Invalid JSON in {path}") from exc
+    except UnicodeDecodeError as exc:
+        raise StorageError(f"Could not read {path}") from exc
+    except OSError as exc:
+        raise StorageError(f"Could not read {path}") from exc
+
+
+def _migrate_config_payload(payload: Any, default_config: StoredConfig) -> Any:
+    if not isinstance(payload, dict) or payload.get("version") != 1:
+        return payload
+
+    legacy_gemini = payload.get("gemini")
+    text_model = default_config.gemini.text_model
+    analysis_model = default_config.gemini.analysis_model
+    if isinstance(legacy_gemini, dict):
+        legacy_model = legacy_gemini.get("model")
+        if legacy_model:
+            text_model = legacy_model
+            analysis_model = legacy_model
+
+    migrated_payload = dict(payload)
+    migrated_payload["version"] = 2
+    migrated_payload["gemini"] = {
+        "text_model": text_model,
+        "analysis_model": analysis_model,
+        "same_model_for_analysis": True,
+        "text_thinking_level": "high",
+    }
+    return migrated_payload
 
 
 def load_secrets(data_root: Path | None = None) -> StoredSecrets:
