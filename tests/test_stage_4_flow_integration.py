@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from sayclearly.app import create_app
 from sayclearly.gemini.client import GeneratedExercise
+from sayclearly.recording.models import StructuredAudioAnalysis
 
 
 def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
@@ -64,13 +65,34 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
 
     assert generate_response.status_code == 200
 
+    def fake_analyze_audio(
+        self,
+        *,
+        audio_bytes,
+        content_type,
+        prompt,
+        model,
+        thinking_level,
+        system_instruction=None,
+    ):
+        return StructuredAudioAnalysis(
+            clarity_score=72,
+            pace_score=65,
+            hesitations=[{"start": 1.0, "end": 2.0, "note": "pause"}],
+            summary=["Good effort."],
+            recommendations=["Keep practicing."],
+        )
+
+    monkeypatch.setattr(
+        "sayclearly.gemini.client.GeminiClient.analyze_audio",
+        fake_analyze_audio,
+    )
+
     analyze_response = client.post(
         "/api/analyze-recording",
         data={
             "metadata": (
-                f'{{"language":"en",'
-                f'"analysis_language":"uk",'
-                f'"exercise_text":"{exercise_text}"}}'
+                f'{{"language":"en","analysis_language":"uk","exercise_text":"{exercise_text}"}}'
             )
         },
         files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
