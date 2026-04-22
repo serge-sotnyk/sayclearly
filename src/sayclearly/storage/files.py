@@ -99,7 +99,7 @@ def load_config(data_root: Path | None = None) -> StoredConfig:
         return default_config
 
     payload = _load_json_payload(path)
-    migrated_payload = _migrate_config_payload(payload)
+    migrated_payload = _migrate_config_payload(payload, default_config)
 
     try:
         config = StoredConfig.model_validate(migrated_payload)
@@ -131,20 +131,24 @@ def _load_json_payload(path: Path) -> Any:
         raise StorageError(f"Could not read {path}") from exc
 
 
-def _migrate_config_payload(payload: Any) -> Any:
+def _migrate_config_payload(payload: Any, default_config: StoredConfig) -> Any:
     if not isinstance(payload, dict) or payload.get("version") != 1:
         return payload
 
     legacy_gemini = payload.get("gemini")
-    legacy_model = None
+    text_model = default_config.gemini.text_model
+    analysis_model = default_config.gemini.analysis_model
     if isinstance(legacy_gemini, dict):
         legacy_model = legacy_gemini.get("model")
+        if legacy_model:
+            text_model = legacy_model
+            analysis_model = legacy_model
 
     migrated_payload = dict(payload)
     migrated_payload["version"] = 2
     migrated_payload["gemini"] = {
-        "text_model": legacy_model,
-        "analysis_model": legacy_model,
+        "text_model": text_model,
+        "analysis_model": analysis_model,
         "same_model_for_analysis": True,
         "text_thinking_level": "high",
     }

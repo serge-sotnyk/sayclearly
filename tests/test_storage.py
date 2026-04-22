@@ -97,6 +97,40 @@ def test_load_config_migrates_version_1_gemini_model_to_version_2_schema(tmp_pat
     }
 
 
+def test_load_config_migrates_version_1_without_gemini_model_using_defaults(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", raising=False)
+    monkeypatch.delenv("SAYCLEARLY_DEFAULT_ANALYSIS_MODEL", raising=False)
+    load_config(tmp_path)
+    (tmp_path / "config.json").write_text(json.dumps({"version": 1}), encoding="utf-8")
+
+    config = load_config(tmp_path)
+
+    assert config.version == 2
+    assert config.gemini.text_model == "gemini-3-flash"
+    assert config.gemini.analysis_model == "gemini-3-flash"
+    assert config.gemini.same_model_for_analysis is True
+    assert config.gemini.text_thinking_level == "high"
+    assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8")) == {
+        "version": 2,
+        "text_language": "uk",
+        "analysis_language": "uk",
+        "ui_language": "en",
+        "same_language_for_analysis": True,
+        "last_topic_prompt": "",
+        "session_limit": 300,
+        "keep_last_audio": False,
+        "gemini": {
+            "text_model": "gemini-3-flash",
+            "analysis_model": "gemini-3-flash",
+            "same_model_for_analysis": True,
+            "text_thinking_level": "high",
+        },
+        "langfuse": {},
+    }
+
+
 def test_save_config_replaces_the_previous_document(tmp_path: Path) -> None:
     config = load_config(tmp_path)
 
