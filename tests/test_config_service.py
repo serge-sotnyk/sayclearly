@@ -192,7 +192,7 @@ def test_get_public_config_hides_secrets_and_reports_effective_sources(
     assert public.langfuse.public_key_source == "stored"
     assert public.langfuse.has_secret_key is True
     assert public.langfuse.secret_key_source == "stored"
-    assert public.langfuse.enabled is True
+    assert public.langfuse.enabled is False
     assert public.model_dump()["gemini"] == {
         "model": "gemini-3-flash-preview",
         "text_model": "gemini-3-flash-preview",
@@ -203,6 +203,23 @@ def test_get_public_config_hides_secrets_and_reports_effective_sources(
         "api_key_source": "env",
         "available_models": public.gemini.available_models,
     }
+
+
+def test_get_public_config_enables_langfuse_only_when_env_runtime_is_complete(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    service = ConfigService(tmp_path)
+    service.update_config(make_payload())
+    monkeypatch.setenv("LANGFUSE_HOST", "https://env-langfuse.example")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "env-public")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "env-secret")
+
+    public = service.get_public_config()
+
+    assert public.langfuse.enabled is True
+    assert public.langfuse.public_key_source == "env"
+    assert public.langfuse.secret_key_source == "env"
 
 
 def test_get_public_config_uses_env_defaults_when_storage_is_missing(

@@ -572,6 +572,23 @@ test('startApp shows friendly messages for load, generate, and clear failures', 
   assert.match(clearShell.elements.get('[data-settings-status]').textContent, /could not clear/i);
 });
 
+test('startApp shows backend generation detail when the API returns a calm 400 message', async () => {
+  const shell = createShell();
+  const { fetchStub } = createFetchStub(
+    createResponse(createConfig()),
+    createResponse(createConfig()),
+    createResponse({ detail: 'Gemini API key was rejected. Update it and try again.' }, false, 400),
+  );
+
+  await startApp(shell.document, fetchStub);
+  await shell.elements.get('[data-generate-button]').click();
+
+  assert.equal(
+    shell.elements.get('[data-status-message]').textContent,
+    'Gemini API key was rejected. Update it and try again.',
+  );
+});
+
 test('startApp keeps manual model choices available when config loading fails', async () => {
   const shell = createShell();
 

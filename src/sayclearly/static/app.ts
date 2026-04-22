@@ -81,6 +81,16 @@ interface StreamLike {
   getTracks(): Array<{ stop(): void }>;
 }
 
+class RequestError extends Error {
+  detail: string | null;
+
+  constructor(message: string, detail: string | null = null) {
+    super(message);
+    this.name = 'RequestError';
+    this.detail = detail;
+  }
+}
+
 interface ShellElements {
   setupScreen: HTMLElement;
   exerciseScreen: HTMLElement;
@@ -305,7 +315,18 @@ async function requestJson<T>(
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${url}`);
+    let detail: string | null = null;
+
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body.detail === 'string' && body.detail.trim() !== '') {
+        detail = body.detail;
+      }
+    } catch {
+      detail = null;
+    }
+
+    throw new RequestError(`Request failed: ${url}`, detail);
   }
 
   return (await response.json()) as T;
@@ -674,9 +695,14 @@ export async function startApp(
       });
       reuseNextGeneration = false;
       model = applyGeneratedExercise(model, exercise);
-    } catch {
+    } catch (error) {
       reuseNextGeneration = false;
-      model = applyGenerationError(model, GENERATE_ERROR_STATUS);
+      model = applyGenerationError(
+        model,
+        error instanceof RequestError && error.detail !== null
+          ? error.detail
+          : GENERATE_ERROR_STATUS,
+      );
     }
 
     render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);

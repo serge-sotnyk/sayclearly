@@ -64,7 +64,7 @@ class ConfigService:
             ),
             langfuse=LangfusePublicConfig(
                 host=langfuse_host,
-                enabled=bool(langfuse_host and langfuse_public_key and langfuse_secret_key),
+                enabled=self._is_langfuse_runtime_enabled(),
                 has_public_key=bool(langfuse_public_key),
                 has_secret_key=bool(langfuse_secret_key),
                 public_key_source=public_key_source,
@@ -144,3 +144,10 @@ class ConfigService:
         if env_value.strip() == "":
             return ""
         return env_value
+
+    def _is_langfuse_runtime_enabled(self) -> bool:
+        return bool(
+            self._get_env_override("LANGFUSE_HOST")
+            and self._get_env_override("LANGFUSE_PUBLIC_KEY")
+            and self._get_env_override("LANGFUSE_SECRET_KEY")
+        )

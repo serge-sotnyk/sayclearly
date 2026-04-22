@@ -30,6 +30,14 @@ const STEP_CONTENT = {
         nextButtonDisabled: true,
     },
 };
+class RequestError extends Error {
+    detail;
+    constructor(message, detail = null) {
+        super(message);
+        this.name = 'RequestError';
+        this.detail = detail;
+    }
+}
 function createDefaultRecordingApi() {
     return {
         isSupported() {
@@ -175,7 +183,17 @@ async function requestJson(fetchImpl, url, options) {
         headers,
     });
     if (!response.ok) {
-        throw new Error(`Request failed: ${url}`);
+        let detail = null;
+        try {
+            const body = (await response.json());
+            if (typeof body.detail === 'string' && body.detail.trim() !== '') {
+                detail = body.detail;
+            }
+        }
+        catch {
+            detail = null;
+        }
+        throw new RequestError(`Request failed: ${url}`, detail);
     }
     return (await response.json());
 }
@@ -492,9 +510,11 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             reuseNextGeneration = false;
             model = applyGeneratedExercise(model, exercise);
         }
-        catch {
+        catch (error) {
             reuseNextGeneration = false;
-            model = applyGenerationError(model, GENERATE_ERROR_STATUS);
+            model = applyGenerationError(model, error instanceof RequestError && error.detail !== null
+                ? error.detail
+                : GENERATE_ERROR_STATUS);
         }
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
     });
