@@ -14,6 +14,29 @@ export type FlowState =
 type ConfigSource = 'env' | 'stored' | 'none';
 type ThinkingLevel = 'low' | 'medium' | 'high';
 
+const FALLBACK_GEMINI_MODELS: GeminiModelCatalogEntry[] = [
+  {
+    id: 'gemini-3-flash-preview',
+    label: 'Gemini 3 Flash',
+    free_tier_requests_per_day_hint: null,
+  },
+  {
+    id: 'gemini-3.1-flash-lite-preview',
+    label: 'Gemini 3.1 Flash-Lite Preview',
+    free_tier_requests_per_day_hint: null,
+  },
+  {
+    id: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash',
+    free_tier_requests_per_day_hint: 250,
+  },
+  {
+    id: 'gemini-2.5-flash-lite',
+    label: 'Gemini 2.5 Flash-Lite',
+    free_tier_requests_per_day_hint: 1000,
+  },
+];
+
 interface GeminiModelCatalogEntry {
   id: string;
   label: string;
@@ -137,7 +160,7 @@ const DEFAULT_CONFIG: PublicConfig = {
     text_thinking_level: 'high',
     has_api_key: false,
     api_key_source: 'none',
-    available_models: [],
+    available_models: FALLBACK_GEMINI_MODELS,
   },
   langfuse: {
     host: null,

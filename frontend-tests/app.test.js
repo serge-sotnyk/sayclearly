@@ -572,6 +572,22 @@ test('startApp shows friendly messages for load, generate, and clear failures', 
   assert.match(clearShell.elements.get('[data-settings-status]').textContent, /could not clear/i);
 });
 
+test('startApp keeps manual model choices available when config loading fails', async () => {
+  const shell = createShell();
+
+  await startApp(shell.document, async () => {
+    throw new Error('load failed');
+  });
+
+  assert.match(shell.elements.get('[data-status-message]').textContent, /could not load/i);
+  assert.equal(shell.elements.get('[data-text-model-select]').value, 'gemini-3-flash-preview');
+  assert.equal(shell.elements.get('[data-analysis-model-select]').value, 'gemini-3-flash-preview');
+  assert.deepEqual(
+    shell.elements.get('[data-text-model-select]').children.map((option) => option.textContent),
+    ['Gemini 3 Flash', 'Gemini 3.1 Flash-Lite Preview', 'Gemini 2.5 Flash (250 RPD hint)', 'Gemini 2.5 Flash-Lite (1000 RPD hint)'],
+  );
+});
+
 test('startApp records, uploads, renders review, and clears review on record again', async () => {
   const shell = createShell();
   const config = createConfig();
