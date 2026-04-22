@@ -6,10 +6,15 @@ from pydantic import (
     Field,
     StringConstraints,
     computed_field,
+    field_validator,
     model_validator,
 )
 
-from sayclearly.gemini.catalog import PRODUCT_DEFAULT_TEXT_THINKING_LEVEL, ThinkingLevel
+from sayclearly.gemini.catalog import (
+    PRODUCT_DEFAULT_TEXT_THINKING_LEVEL,
+    ThinkingLevel,
+    is_supported_gemini_model,
+)
 
 ConfigSource = Literal["env", "stored", "none"]
 NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -44,6 +49,13 @@ class GeminiConfigUpdate(BaseModel):
             )
 
         return normalized_value
+
+    @field_validator("text_model", "analysis_model")
+    @classmethod
+    def validate_supported_model(cls, value: str) -> str:
+        if not is_supported_gemini_model(value):
+            raise ValueError("Unsupported Gemini model")
+        return value
 
 
 class LangfuseConfigUpdate(BaseModel):

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from sayclearly.app import create_app
@@ -90,6 +91,27 @@ def test_post_config_returns_422_for_semantically_invalid_payload(tmp_path: Path
     client = TestClient(create_app(tmp_path))
     payload = make_payload()
     payload["session_limit"] = 0
+
+    response = client.post("/api/config", json=payload)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("text_model", "gemini-1.5-pro"),
+        ("analysis_model", "custom-hand-edited-model"),
+    ],
+)
+def test_post_config_rejects_unsupported_gemini_models(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    client = TestClient(create_app(tmp_path))
+    payload = make_payload()
+    payload["gemini"][field] = value
 
     response = client.post("/api/config", json=payload)
 

@@ -168,6 +168,27 @@ def test_update_payload_accepts_legacy_gemini_model_field() -> None:
     assert payload.gemini.same_model_for_analysis is True
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("text_model", "gemini-1.5-pro"),
+        ("analysis_model", "custom-hand-edited-model"),
+    ],
+)
+def test_update_payload_rejects_unsupported_gemini_models(field: str, value: str) -> None:
+    payload = {
+        "text_model": "gemini-3-flash-preview",
+        "analysis_model": "gemini-3.1-flash-lite-preview",
+        "same_model_for_analysis": False,
+        "text_thinking_level": "medium",
+        "api_key": "stored-gemini",
+    }
+    payload[field] = value
+
+    with pytest.raises(ValidationError, match=field):
+        make_payload(gemini=payload)
+
+
 def test_get_public_config_hides_secrets_and_reports_effective_sources(
     tmp_path: Path,
     monkeypatch,
