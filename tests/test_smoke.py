@@ -148,10 +148,37 @@ def test_main_loads_dotenv_from_current_working_directory_before_creating_app(
     main_module.main()
 
     assert calls[0] == ("find_dotenv", ".env", True)
-    assert calls[0] == (
-        "find_dotenv",
-        ".env",
-        True,
-    )
     assert calls[1] == ("load_dotenv", dotenv_path, False)
     assert calls[2] == ("create_app",)
+
+
+def test_main_skips_dotenv_loading_when_no_cwd_env_file_exists(monkeypatch) -> None:
+    calls: list[tuple[object, ...]] = []
+
+    def fake_find_dotenv(*, filename: str, usecwd: bool) -> str:
+        calls.append(("find_dotenv", filename, usecwd))
+        return ""
+
+    def fake_load_dotenv(*, override: bool) -> bool:
+        calls.append(("load_dotenv", override))
+        return True
+
+    def fake_create_app() -> FastAPI:
+        calls.append(("create_app",))
+        return FastAPI()
+
+    def fake_run(app: object, host: str, port: int) -> None:
+        calls.append(("run", host, port))
+
+    monkeypatch.setattr(main_module, "find_dotenv", fake_find_dotenv)
+    monkeypatch.setattr(main_module, "load_dotenv", fake_load_dotenv)
+    monkeypatch.setattr(main_module, "create_app", fake_create_app)
+    monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
+
+    main_module.main()
+
+    assert calls == [
+        ("find_dotenv", ".env", True),
+        ("create_app",),
+        ("run", main_module.HOST, main_module.PORT),
+    ]

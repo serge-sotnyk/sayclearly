@@ -17,8 +17,6 @@ def main() -> None:
     dotenv_path = find_dotenv(filename=".env", usecwd=True)
     if dotenv_path:
         load_dotenv(dotenv_path=Path(dotenv_path), override=False)
-    else:
-        load_dotenv(override=False)
     app = create_app()
     url = f"http://{HOST}:{PORT}/"
 
