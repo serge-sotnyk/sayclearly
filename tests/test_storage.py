@@ -15,7 +15,10 @@ from sayclearly.storage.files import (
 from sayclearly.storage.models import HistoryStore, StoredSecrets
 
 
-def test_load_config_creates_default_storage_tree(tmp_path: Path) -> None:
+def test_load_config_creates_default_storage_tree(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", raising=False)
+    monkeypatch.delenv("SAYCLEARLY_DEFAULT_ANALYSIS_MODEL", raising=False)
+
     config = load_config(tmp_path)
 
     assert config.version == 2

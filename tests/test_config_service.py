@@ -155,6 +155,19 @@ def test_update_payload_rejects_empty_provider_values(field: str, value: object)
         make_payload(**{field: value})
 
 
+def test_update_payload_accepts_legacy_gemini_model_field() -> None:
+    payload = make_payload(
+        gemini={
+            "model": "gemini-3.1-flash-lite-preview",
+            "api_key": None,
+        }
+    )
+
+    assert payload.gemini.text_model == "gemini-3.1-flash-lite-preview"
+    assert payload.gemini.analysis_model == "gemini-3.1-flash-lite-preview"
+    assert payload.gemini.same_model_for_analysis is True
+
+
 def test_get_public_config_hides_secrets_and_reports_effective_sources(
     tmp_path: Path,
     monkeypatch,
@@ -181,6 +194,7 @@ def test_get_public_config_hides_secrets_and_reports_effective_sources(
     assert public.langfuse.secret_key_source == "stored"
     assert public.langfuse.enabled is True
     assert public.model_dump()["gemini"] == {
+        "model": "gemini-3-flash",
         "text_model": "gemini-3-flash",
         "analysis_model": "gemini-3.1-flash-lite-preview",
         "same_model_for_analysis": False,

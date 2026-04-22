@@ -1,8 +1,8 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, computed_field, model_validator
 
-from sayclearly.gemini.catalog import ThinkingLevel
+from sayclearly.gemini.catalog import PRODUCT_DEFAULT_TEXT_THINKING_LEVEL, ThinkingLevel
 
 ConfigSource = Literal["env", "stored", "none"]
 NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -16,6 +16,27 @@ class GeminiConfigUpdate(BaseModel):
     same_model_for_analysis: bool
     text_thinking_level: ThinkingLevel
     api_key: NonEmptyString | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def expand_legacy_model_field(cls, value: object) -> object:
+        if not isinstance(value, dict) or "model" not in value:
+            return value
+
+        legacy_model = value.get("model")
+        normalized_value = dict(value)
+        normalized_value.pop("model", None)
+
+        if legacy_model is not None:
+            normalized_value.setdefault("text_model", legacy_model)
+            normalized_value.setdefault("analysis_model", legacy_model)
+            normalized_value.setdefault("same_model_for_analysis", True)
+            normalized_value.setdefault(
+                "text_thinking_level",
+                PRODUCT_DEFAULT_TEXT_THINKING_LEVEL,
+            )
+
+        return normalized_value
 
 
 class LangfuseConfigUpdate(BaseModel):
@@ -50,6 +71,11 @@ class GeminiPublicConfig(BaseModel):
     has_api_key: bool
     api_key_source: ConfigSource
     available_models: list[dict[str, str | int | None]]
+
+    @computed_field
+    @property
+    def model(self) -> str:
+        return self.text_model
 
 
 class LangfusePublicConfig(BaseModel):

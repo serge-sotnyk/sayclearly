@@ -5,17 +5,20 @@ import webbrowser
 from pathlib import Path
 
 import uvicorn
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 from sayclearly.app import create_app
 
 HOST = "127.0.0.1"
 PORT = 8008
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
-    load_dotenv(dotenv_path=PROJECT_ROOT / ".env", override=False)
+    dotenv_path = find_dotenv(filename=".env", usecwd=True)
+    if dotenv_path:
+        load_dotenv(dotenv_path=Path(dotenv_path), override=False)
+    else:
+        load_dotenv(override=False)
     app = create_app()
     url = f"http://{HOST}:{PORT}/"
 

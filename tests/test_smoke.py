@@ -119,8 +119,15 @@ def test_main_registers_browser_open_on_app_startup(monkeypatch) -> None:
     assert startup_handler_counts == [1]
 
 
-def test_main_loads_project_dotenv_before_creating_app(monkeypatch) -> None:
-    calls: list[tuple[str, object]] = []
+def test_main_loads_dotenv_from_current_working_directory_before_creating_app(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+    dotenv_path = Path("C:/workspace/.env")
+
+    def fake_find_dotenv(*, filename: str, usecwd: bool) -> str:
+        calls.append(("find_dotenv", filename, usecwd))
+        return str(dotenv_path)
 
     def fake_load_dotenv(*, dotenv_path: Path, override: bool) -> bool:
         calls.append(("load_dotenv", dotenv_path, override))
@@ -133,15 +140,18 @@ def test_main_loads_project_dotenv_before_creating_app(monkeypatch) -> None:
     def fake_run(app: object, host: str, port: int) -> None:
         calls.append(("run", host, port))
 
+    monkeypatch.setattr(main_module, "find_dotenv", fake_find_dotenv)
     monkeypatch.setattr(main_module, "load_dotenv", fake_load_dotenv)
     monkeypatch.setattr(main_module, "create_app", fake_create_app)
     monkeypatch.setattr(main_module.uvicorn, "run", fake_run)
 
     main_module.main()
 
+    assert calls[0] == ("find_dotenv", ".env", True)
     assert calls[0] == (
-        "load_dotenv",
-        main_module.PROJECT_ROOT / ".env",
-        False,
+        "find_dotenv",
+        ".env",
+        True,
     )
-    assert calls[1] == ("create_app",)
+    assert calls[1] == ("load_dotenv", dotenv_path, False)
+    assert calls[2] == ("create_app",)

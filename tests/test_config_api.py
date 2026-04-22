@@ -36,6 +36,7 @@ def test_get_config_returns_public_contract(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json()["gemini"] == {
+        "model": "gemini-3-flash",
         "text_model": "gemini-3-flash",
         "analysis_model": "gemini-3-flash",
         "same_model_for_analysis": True,
@@ -93,3 +94,20 @@ def test_post_config_returns_422_for_semantically_invalid_payload(tmp_path: Path
     response = client.post("/api/config", json=payload)
 
     assert response.status_code == 422
+
+
+def test_post_config_accepts_legacy_gemini_model_payload(tmp_path: Path) -> None:
+    client = TestClient(create_app(tmp_path))
+    payload = make_payload()
+    payload["gemini"] = {
+        "model": "gemini-3.1-flash-lite-preview",
+        "api_key": None,
+    }
+
+    response = client.post("/api/config", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["gemini"]["model"] == "gemini-3.1-flash-lite-preview"
+    assert response.json()["gemini"]["text_model"] == "gemini-3.1-flash-lite-preview"
+    assert response.json()["gemini"]["analysis_model"] == "gemini-3.1-flash-lite-preview"
+    assert response.json()["gemini"]["same_model_for_analysis"] is True
