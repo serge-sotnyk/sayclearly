@@ -160,14 +160,16 @@ def test_generate_text_scopes_recent_history_to_request_language(tmp_path: Path)
             update={
                 "sessions": [
                     make_history_session("01", "Read slowly and relax your jaw."),
-                    make_history_session("02", "Keep your shoulders loose while speaking.").model_copy(
-                        update={"language": "uk"}
-                    ),
+                    make_history_session(
+                        "02", "Keep your shoulders loose while speaking."
+                    ).model_copy(update={"language": "uk"}),
                 ]
             }
         ),
     )
-    client = FakeGeminiClient(GeneratedExercise(text="Start slowly, then let the rhythm stay even."))
+    client = FakeGeminiClient(
+        GeneratedExercise(text="Start slowly, then let the rhythm stay even.")
+    )
     service = ExerciseService(tmp_path, gemini_client=client)
 
     service.generate_text(
