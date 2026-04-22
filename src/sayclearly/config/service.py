@@ -142,7 +142,7 @@ class ConfigService:
         if env_value is None:
             return None
         if env_value.strip() == "":
-            return ""
+            return None
         return env_value
 
     def _is_langfuse_runtime_enabled(self) -> bool:

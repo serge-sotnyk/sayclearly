@@ -293,6 +293,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     let model = createInitialAppModel();
     let isSettingsOpen = false;
     let reuseNextGeneration = false;
+    let hasLoadedConfig = false;
     let activeRecorder = null;
     let activeStream = null;
     let activeRecorderToken = 0;
@@ -475,6 +476,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                 method: 'DELETE',
             });
             model = applyLoadedConfig(model, config);
+            hasLoadedConfig = true;
             model = {
                 ...model,
                 error_message: null,
@@ -495,10 +497,24 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
         model = startGeneration(model);
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
         try {
+            let configForSave = model.config;
+            if (!hasLoadedConfig) {
+                try {
+                    configForSave = await requestJson(fetchImpl, '/api/config', {
+                        method: 'GET',
+                    });
+                    model = applyLoadedConfig(model, configForSave);
+                    hasLoadedConfig = true;
+                }
+                catch {
+                    throw new RequestError('Request failed: /api/config', LOAD_ERROR_STATUS);
+                }
+            }
             const savedConfig = await requestJson(fetchImpl, '/api/config', {
                 method: 'POST',
-                body: JSON.stringify(buildConfigRequest(model.config, settings, elements.apiKeyInput.value)),
+                body: JSON.stringify(buildConfigRequest(configForSave, settings, elements.apiKeyInput.value)),
             });
+            hasLoadedConfig = true;
             model = {
                 ...model,
                 config: savedConfig,
@@ -528,6 +544,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             method: 'GET',
         });
         model = applyLoadedConfig(model, config);
+        hasLoadedConfig = true;
         model = {
             ...model,
             error_message: null,

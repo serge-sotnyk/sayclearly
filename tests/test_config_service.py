@@ -386,7 +386,7 @@ def test_clear_stored_gemini_api_key_keeps_environment_override_effective(
     assert json.loads((tmp_path / "secrets.json").read_text(encoding="utf-8"))["gemini"] == {}
 
 
-def test_empty_string_environment_override_disables_stored_values(
+def test_empty_string_environment_override_does_not_mask_stored_values(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -397,13 +397,13 @@ def test_empty_string_environment_override_disables_stored_values(
 
     public = service.get_public_config()
 
-    assert public.gemini.has_api_key is False
-    assert public.gemini.api_key_source == "env"
-    assert public.langfuse.host == ""
+    assert public.gemini.has_api_key is True
+    assert public.gemini.api_key_source == "stored"
+    assert public.langfuse.host == "https://langfuse.example"
     assert public.langfuse.enabled is False
 
 
-def test_whitespace_only_environment_override_disables_stored_values(
+def test_whitespace_only_environment_override_does_not_mask_stored_values(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -414,7 +414,7 @@ def test_whitespace_only_environment_override_disables_stored_values(
 
     public = service.get_public_config()
 
-    assert public.gemini.has_api_key is False
-    assert public.gemini.api_key_source == "env"
-    assert public.langfuse.host == ""
+    assert public.gemini.has_api_key is True
+    assert public.gemini.api_key_source == "stored"
+    assert public.langfuse.host == "https://langfuse.example"
     assert public.langfuse.enabled is False

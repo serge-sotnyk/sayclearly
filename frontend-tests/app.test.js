@@ -605,6 +605,65 @@ test('startApp keeps manual model choices available when config loading fails', 
   );
 });
 
+test('startApp reloads persisted config before saving after the initial config load fails', async () => {
+  const shell = createShell();
+  const storedConfig = createConfig({
+    ui_language: 'en',
+    session_limit: 77,
+    keep_last_audio: true,
+    langfuse: {
+      host: 'https://langfuse.example',
+      enabled: false,
+      has_public_key: true,
+      has_secret_key: true,
+      public_key_source: 'stored',
+      secret_key_source: 'stored',
+    },
+  });
+  const exercise = createExercise({ topic_prompt: 'Fresh topic' });
+  const { fetchStub, calls } = createFetchStub(
+    new Error('initial load failed'),
+    createResponse(storedConfig),
+    createResponse(storedConfig),
+    createResponse(exercise),
+  );
+
+  await startApp(shell.document, fetchStub);
+
+  shell.elements.get('[data-topic-input]').value = 'Fresh topic';
+  await shell.elements.get('[data-topic-input]').input();
+  shell.elements.get('[data-text-model-select]').value = 'gemini-2.5-flash';
+  await shell.elements.get('[data-text-model-select]').change();
+  await shell.elements.get('[data-generate-button]').click();
+
+  assert.deepEqual(
+    calls.map((call) => call.url),
+    ['/api/config', '/api/config', '/api/config', '/api/generate-text'],
+  );
+  assert.deepEqual(JSON.parse(calls[2].options.body), {
+    text_language: 'uk',
+    analysis_language: 'uk',
+    same_language_for_analysis: true,
+    ui_language: 'en',
+    last_topic_prompt: 'Fresh topic',
+    session_limit: 77,
+    keep_last_audio: true,
+    gemini: {
+      text_model: 'gemini-2.5-flash',
+      analysis_model: 'gemini-2.5-flash',
+      same_model_for_analysis: true,
+      text_thinking_level: 'high',
+      api_key: null,
+    },
+    langfuse: {
+      host: 'https://langfuse.example',
+      public_key: null,
+      secret_key: null,
+    },
+  });
+  assert.equal(shell.elements.get('[data-exercise-text]').textContent, exercise.text);
+});
+
 test('startApp records, uploads, renders review, and clears review on record again', async () => {
   const shell = createShell();
   const config = createConfig();

@@ -445,6 +445,7 @@ export async function startApp(
   let model = createInitialAppModel();
   let isSettingsOpen = false;
   let reuseNextGeneration = false;
+  let hasLoadedConfig = false;
   let activeRecorder: RecorderLike | null = null;
   let activeStream: StreamLike | null = null;
   let activeRecorderToken = 0;
@@ -657,6 +658,7 @@ export async function startApp(
         method: 'DELETE',
       });
       model = applyLoadedConfig(model, config);
+      hasLoadedConfig = true;
       model = {
         ...model,
         error_message: null,
@@ -678,12 +680,26 @@ export async function startApp(
     render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
 
     try {
+      let configForSave = model.config;
+      if (!hasLoadedConfig) {
+        try {
+          configForSave = await requestJson<PublicConfig>(fetchImpl, '/api/config', {
+            method: 'GET',
+          });
+          model = applyLoadedConfig(model, configForSave);
+          hasLoadedConfig = true;
+        } catch {
+          throw new RequestError('Request failed: /api/config', LOAD_ERROR_STATUS);
+        }
+      }
+
       const savedConfig = await requestJson<PublicConfig>(fetchImpl, '/api/config', {
         method: 'POST',
         body: JSON.stringify(
-          buildConfigRequest(model.config, settings, elements.apiKeyInput.value),
+          buildConfigRequest(configForSave, settings, elements.apiKeyInput.value),
         ),
       });
+      hasLoadedConfig = true;
       model = {
         ...model,
         config: savedConfig,
@@ -719,6 +735,7 @@ export async function startApp(
       method: 'GET',
     });
     model = applyLoadedConfig(model, config);
+    hasLoadedConfig = true;
     model = {
       ...model,
       error_message: null,
