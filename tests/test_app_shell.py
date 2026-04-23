@@ -90,3 +90,24 @@ def test_frontend_bundle_is_served_with_generate_endpoint_reference() -> None:
     assert response.status_code == 200
     assert "javascript" in response.headers["content-type"]
     assert "/api/generate-text" in response.text
+
+
+def test_home_page_renders_stage_7_history_hooks() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "data-new-session-button" in response.text
+    assert "data-review-reuse-topic-button" in response.text
+    assert "data-open-history-button" in response.text
+    assert 'data-screen="history"' in response.text
+    assert "data-history-list" in response.text
+    assert "data-history-empty-state" in response.text
+    assert "data-history-error" in response.text
+    assert "data-history-retry-button" in response.text
+    assert "data-history-back-button" in response.text
+    assert "data-history-details" in response.text
+    assert "data-history-detail-summary" in response.text
+    assert "data-history-detail-text" in response.text
+    assert "data-history-detail-reuse-topic-button" in response.text
