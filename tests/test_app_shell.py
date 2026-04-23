@@ -92,6 +92,16 @@ def test_frontend_bundle_is_served_with_generate_endpoint_reference() -> None:
     assert "/api/generate-text" in response.text
 
 
+def test_stylesheet_preserves_hidden_attribute_behavior() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/static/styles.css")
+
+    assert response.status_code == 200
+    assert "[hidden]" in response.text
+    assert "display: none !important;" in response.text
+
+
 def test_home_page_renders_stage_7_history_hooks() -> None:
     client = TestClient(create_app())
 
