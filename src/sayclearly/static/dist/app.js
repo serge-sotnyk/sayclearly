@@ -219,7 +219,16 @@ async function requestJson(fetchImpl, url, options) {
 function getRequestErrorMessage(error, fallback) {
     return error instanceof RequestError && error.detail !== null ? error.detail : fallback;
 }
-function render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl) {
+function render(
+  documentRef,
+  elements,
+  model,
+  isSettingsOpen,
+  reuseNextGeneration,
+  recordedUrl,
+  fetchImpl,
+  clearRecordingArtifacts,
+) {
     renderModelOptions(documentRef, elements.textModelSelect, model.config.gemini.available_models);
     renderModelOptions(documentRef, elements.analysisModelSelect, model.config.gemini.available_models);
     elements.textModelSelect.value = model.settings.text_model;
@@ -347,18 +356,18 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             ...model,
             settings: nextSettings,
         };
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     };
     const refreshFromInputs = () => {
         updateSettings(readSettings(elements, reuseNextGeneration));
     };
     elements.openSettingsButton.addEventListener('click', () => {
         isSettingsOpen = true;
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.closeSettingsButton.addEventListener('click', () => {
         isSettingsOpen = false;
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.textLanguageInput.addEventListener('input', () => {
         refreshFromInputs();
@@ -393,16 +402,16 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     });
     elements.nextStepButton.addEventListener('click', () => {
         model = advanceExerciseStep(model);
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.startRecordingButton.addEventListener('click', async () => {
         if (!recordingApi.isSupported()) {
             model = applyRecordingError(model, 'This browser does not support microphone recording.');
-            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
             return;
         }
         model = startRecordingRequest(model);
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
         const recorderToken = activeRecorderToken + 1;
         activeRecorderToken = recorderToken;
         try {
@@ -433,7 +442,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                 if (blob.size === 0) {
                     clearRecordingArtifacts();
                     model = applyRecordingError(model, 'No recording was captured. Please try again.');
-                    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+                    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
                     return;
                 }
                 if (recordedUrl !== null) {
@@ -442,7 +451,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                 recordedBlob = blob;
                 recordedUrl = recordingApi.createObjectURL(blob);
                 model = storeRecordedAudio(model);
-                render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+                render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
             });
             recorder.start();
             model = markRecordingStarted(model);
@@ -455,7 +464,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             stopActiveStream();
             model = applyRecordingError(model, 'Microphone access was unavailable. Please try again.');
         }
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.stopRecordingButton.addEventListener('click', () => {
         activeRecorder?.stop();
@@ -463,11 +472,11 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     elements.analyzeRecordingButton.addEventListener('click', async () => {
         if (recordedBlob === null) {
             model = applyRecordingError(model, 'No recording was captured. Please try again.');
-            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
             return;
         }
         model = startRecordingAnalysis(model);
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
         try {
             const formData = new FormData();
             formData.append('audio', recordedBlob, 'retelling.webm');
@@ -488,19 +497,19 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
         catch {
             model = applyAnalysisError(model, 'Could not upload the recording. Try again.');
         }
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.recordAgainButton.addEventListener('click', () => {
         clearRecordingArtifacts();
         model = resetRecording(model);
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.resetButton.addEventListener('click', () => {
         reuseNextGeneration = false;
         clearRecordingArtifacts();
         const resetModel = createInitialAppModel();
         model = applyLoadedConfig(resetModel, model.config);
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.clearApiKeyButton.addEventListener('click', async () => {
         try {
@@ -517,7 +526,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                 error_message: null,
             };
             elements.apiKeyInput.value = '';
-            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+            render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
         }
         catch {
             elements.settingsStatus.textContent = CLEAR_ERROR_STATUS;
@@ -530,7 +539,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             settings,
         };
         model = startGeneration(model);
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
         try {
             let configForSave = model.config;
             if (!hasLoadedConfig) {
@@ -569,13 +578,13 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             reuseNextGeneration = false;
             model = applyGenerationError(model, getRequestErrorMessage(error, GENERATE_ERROR_STATUS));
         }
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     model = {
         ...model,
         error_message: LOADING_STATUS,
     };
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     try {
         const config = await requestJson(fetchImpl, '/api/config', {
             method: 'GET',
@@ -594,7 +603,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             flow: 'home',
         };
     }
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
 }
 if (typeof document !== 'undefined' && typeof fetch !== 'undefined') {
     void startApp();

@@ -369,6 +369,8 @@ function render(
   isSettingsOpen: boolean,
   reuseNextGeneration: boolean,
   recordedUrl: string | null,
+  fetchImpl: typeof fetch,
+  clearRecordingArtifacts: () => void,
 ): void {
   renderModelOptions(documentRef, elements.textModelSelect, model.config.gemini.available_models);
   renderModelOptions(documentRef, elements.analysisModelSelect, model.config.gemini.available_models);
@@ -511,7 +513,7 @@ export async function startApp(
       ...model,
       settings: nextSettings,
     };
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   };
 
   const refreshFromInputs = (): void => {
@@ -520,12 +522,12 @@ export async function startApp(
 
   elements.openSettingsButton.addEventListener('click', () => {
     isSettingsOpen = true;
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   });
 
   elements.closeSettingsButton.addEventListener('click', () => {
     isSettingsOpen = false;
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   });
 
   elements.textLanguageInput.addEventListener('input', () => {
@@ -570,18 +572,18 @@ export async function startApp(
 
   elements.nextStepButton.addEventListener('click', () => {
     model = advanceExerciseStep(model);
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   });
 
   elements.startRecordingButton.addEventListener('click', async () => {
     if (!recordingApi.isSupported()) {
       model = applyRecordingError(model, 'This browser does not support microphone recording.');
-      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
       return;
     }
 
     model = startRecordingRequest(model);
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
 
     const recorderToken = activeRecorderToken + 1;
     activeRecorderToken = recorderToken;
@@ -615,7 +617,7 @@ export async function startApp(
         if (blob.size === 0) {
           clearRecordingArtifacts();
           model = applyRecordingError(model, 'No recording was captured. Please try again.');
-          render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+          render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
           return;
         }
 
@@ -625,7 +627,7 @@ export async function startApp(
         recordedBlob = blob;
         recordedUrl = recordingApi.createObjectURL(blob);
         model = storeRecordedAudio(model);
-        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+        render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
       });
       recorder.start();
       model = markRecordingStarted(model);
@@ -638,7 +640,7 @@ export async function startApp(
       model = applyRecordingError(model, 'Microphone access was unavailable. Please try again.');
     }
 
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   });
 
   elements.stopRecordingButton.addEventListener('click', () => {
@@ -648,12 +650,12 @@ export async function startApp(
   elements.analyzeRecordingButton.addEventListener('click', async () => {
     if (recordedBlob === null) {
       model = applyRecordingError(model, 'No recording was captured. Please try again.');
-      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
       return;
     }
 
     model = startRecordingAnalysis(model);
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
 
     try {
       const formData = new FormData();
@@ -675,13 +677,13 @@ export async function startApp(
       model = applyAnalysisError(model, 'Could not upload the recording. Try again.');
     }
 
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   });
 
   elements.recordAgainButton.addEventListener('click', () => {
     clearRecordingArtifacts();
     model = resetRecording(model);
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   });
 
   elements.resetButton.addEventListener('click', () => {
@@ -689,7 +691,7 @@ export async function startApp(
     clearRecordingArtifacts();
     const resetModel = createInitialAppModel();
     model = applyLoadedConfig(resetModel, model.config);
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   });
 
   elements.clearApiKeyButton.addEventListener('click', async () => {
@@ -707,7 +709,7 @@ export async function startApp(
         error_message: null,
       };
       elements.apiKeyInput.value = '';
-      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     } catch {
       elements.settingsStatus.textContent = CLEAR_ERROR_STATUS;
     }
@@ -720,7 +722,7 @@ export async function startApp(
       settings,
     };
     model = startGeneration(model);
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
 
     try {
       let configForSave = model.config;
@@ -766,14 +768,14 @@ export async function startApp(
       );
     }
 
-    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
   });
 
   model = {
     ...model,
     error_message: LOADING_STATUS,
   };
-  render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+  render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
 
   try {
     const config = await requestJson<PublicConfig>(fetchImpl, '/api/config', {
@@ -793,7 +795,7 @@ export async function startApp(
     };
   }
 
-  render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+  render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
 }
 
 if (typeof document !== 'undefined' && typeof fetch !== 'undefined') {
