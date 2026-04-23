@@ -247,6 +247,11 @@ audio[data-recording-preview] {
         min-width: auto;
         width: 100%;
     }
+
+    .history-header,
+    .history-layout {
+        flex-direction: column;
+    }
 }
 
 @media (max-width: 640px) {
@@ -341,9 +346,3 @@ audio[data-recording-preview] {
     color: #334e68;
 }
 
-@media (max-width: 960px) {
-    .history-header,
-    .history-layout {
-        flex-direction: column;
-    }
-}
