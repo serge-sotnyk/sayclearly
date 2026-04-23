@@ -70,6 +70,7 @@ function collectShellElements(root) {
     return {
         setupScreen: getRequiredElement(root, '[data-screen="setup"]'),
         exerciseScreen: getRequiredElement(root, '[data-screen="exercise"]'),
+        reviewActions: getRequiredElement(root, '[data-review-actions]'),
         settingsPanel: getRequiredElement(root, '[data-settings-panel]'),
         openSettingsButton: getRequiredElement(root, '[data-open-settings-button]'),
         closeSettingsButton: getRequiredElement(root, '[data-close-settings-button]'),
@@ -306,6 +307,7 @@ function render(documentRef, elements, model, isSettingsOpen, reuseNextGeneratio
     elements.recordingPreview.hidden = recordedUrl === null;
     elements.recordingPreview.src = recordedUrl ?? '';
     elements.reviewPanel.hidden = model.review === null;
+    elements.reviewActions.hidden = model.flow !== 'review' || model.review === null;
     elements.reviewSummary.textContent = model.review?.summary ?? '';
     elements.reviewClarity.textContent = model.review?.clarity ?? '';
     elements.reviewPace.textContent = model.review?.pace ?? '';
@@ -672,16 +674,24 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.historyRetryButton.addEventListener('click', async () => {
-        const selectedId = model.selected_history_session?.id;
-        if (!selectedId) {
-            return;
-        }
         try {
-            const session = await loadHistorySession(fetchImpl, selectedId);
-            model = applyHistoryDetails(model, session);
+            if (model.history_sessions === null) {
+                const history = await loadHistory(fetchImpl);
+                model = applyHistoryLoaded(model, history);
+            }
+            else {
+                const selectedId = model.selected_history_session?.id;
+                if (!selectedId) {
+                    return;
+                }
+                const session = await loadHistorySession(fetchImpl, selectedId);
+                model = applyHistoryDetails(model, session);
+            }
         }
         catch {
-            model = applyHistoryError(model, 'Could not load session details. Try again.');
+            model = applyHistoryError(model, model.history_sessions === null
+                ? 'Could not load saved history. Try again.'
+                : 'Could not load session details. Try again.');
         }
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });

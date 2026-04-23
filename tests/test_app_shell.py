@@ -98,6 +98,7 @@ def test_home_page_renders_stage_7_history_hooks() -> None:
     response = client.get("/")
 
     assert response.status_code == 200
+    assert "data-review-actions" in response.text
     assert "data-new-session-button" in response.text
     assert "data-review-reuse-topic-button" in response.text
     assert "data-open-history-button" in response.text
@@ -111,3 +112,12 @@ def test_home_page_renders_stage_7_history_hooks() -> None:
     assert "data-history-detail-summary" in response.text
     assert "data-history-detail-text" in response.text
     assert "data-history-detail-reuse-topic-button" in response.text
+
+
+def test_home_page_keeps_review_actions_hidden_until_review_state() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "data-review-actions hidden" in response.text

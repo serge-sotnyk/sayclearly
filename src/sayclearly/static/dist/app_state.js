@@ -149,6 +149,8 @@ export function startGeneration(model) {
         flow: 'generating_text',
         settings: syncSettings(model.settings),
         generated_exercise: null,
+        latest_session: null,
+        history_save_error: null,
         error_message: null,
     };
 }
@@ -160,6 +162,8 @@ export function applyGeneratedExercise(model, exercise) {
         has_recording: false,
         recording_error: null,
         review: null,
+        latest_session: null,
+        history_save_error: null,
         error_message: null,
     };
 }
@@ -252,6 +256,8 @@ export function enterHistory(model, origin) {
         ...model,
         flow: 'history',
         history_origin: origin,
+        history_sessions: null,
+        selected_history_session: null,
         history_error: null,
     };
 }
