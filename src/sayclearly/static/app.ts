@@ -4,13 +4,21 @@ import {
   applyAnalysisResult,
   applyGeneratedExercise,
   applyGenerationError,
+  applyHistoryDetails,
+  applyHistoryError,
+  applyHistoryLoaded,
+  applyHistorySaveError,
   applyLoadedConfig,
   applyRecordingError,
   buildConfigUpdatePayload,
   buildGenerateRequest,
   createInitialAppModel,
+  enterHistory,
   markRecordingStarted,
   resetRecording,
+  returnFromHistory,
+  reuseTopic,
+  startNewSession,
   startRecordingAnalysis,
   startRecordingRequest,
   startGeneration,
@@ -19,8 +27,10 @@ import {
   syncAnalysisLanguage,
   type AppModel,
   type GeneratedExercise,
+  type HistorySession,
+  type HistoryStore,
   type PublicConfig,
-  type RecordingReview,
+  type RecordingAnalysisResult,
   type SettingsFormState,
 } from './app_state.js';
 
@@ -61,6 +71,7 @@ const STEP_CONTENT = {
 
 type RootLike = ParentNode & {
   querySelector<E extends Element = Element>(selector: string): E | null;
+  querySelectorAll<E extends Element = Element>(selector: string): NodeListOf<E>;
 };
 
 interface RecorderLike {
@@ -131,6 +142,24 @@ interface ShellElements {
   stepTitle: HTMLElement;
   stepInstruction: HTMLElement;
   exerciseText: HTMLElement;
+  historyScreen: HTMLElement;
+  newSessionButtons: HTMLButtonElement[];
+  reviewReuseTopicButton: HTMLButtonElement;
+  openHistoryButton: HTMLButtonElement;
+  historyList: HTMLElement;
+  historyEmptyState: HTMLElement;
+  historyError: HTMLElement;
+  historySaveError: HTMLElement;
+  historyRetryButton: HTMLButtonElement;
+  historyBackButton: HTMLButtonElement;
+  historyDetails: HTMLElement;
+  historyDetailSummary: HTMLElement;
+  historyDetailMeta: HTMLElement;
+  historyDetailText: HTMLElement;
+  historyDetailClarity: HTMLElement;
+  historyDetailPace: HTMLElement;
+  historyDetailHesitations: HTMLElement;
+  historyDetailReuseTopicButton: HTMLButtonElement;
 }
 
 function createDefaultRecordingApi(): RecordingApi {
@@ -207,6 +236,27 @@ function collectShellElements(root: RootLike): ShellElements {
     stepTitle: getRequiredElement(root, '[data-step-title]'),
     stepInstruction: getRequiredElement(root, '[data-step-instruction]'),
     exerciseText: getRequiredElement(root, '[data-exercise-text]'),
+    historyScreen: getRequiredElement(root, '[data-screen="history"]'),
+    newSessionButtons: Array.from(root.querySelectorAll('[data-new-session-button]')),
+    reviewReuseTopicButton: getRequiredElement(root, '[data-review-reuse-topic-button]'),
+    openHistoryButton: getRequiredElement(root, '[data-open-history-button]'),
+    historyList: getRequiredElement(root, '[data-history-list]'),
+    historyEmptyState: getRequiredElement(root, '[data-history-empty-state]'),
+    historyError: getRequiredElement(root, '[data-history-error]'),
+    historySaveError: getRequiredElement(root, '[data-history-save-error]'),
+    historyRetryButton: getRequiredElement(root, '[data-history-retry-button]'),
+    historyBackButton: getRequiredElement(root, '[data-history-back-button]'),
+    historyDetails: getRequiredElement(root, '[data-history-details]'),
+    historyDetailSummary: getRequiredElement(root, '[data-history-detail-summary]'),
+    historyDetailMeta: getRequiredElement(root, '[data-history-detail-meta]'),
+    historyDetailText: getRequiredElement(root, '[data-history-detail-text]'),
+    historyDetailClarity: getRequiredElement(root, '[data-history-detail-clarity]'),
+    historyDetailPace: getRequiredElement(root, '[data-history-detail-pace]'),
+    historyDetailHesitations: getRequiredElement(root, '[data-history-detail-hesitations]'),
+    historyDetailReuseTopicButton: getRequiredElement(
+      root,
+      '[data-history-detail-reuse-topic-button]',
+    ),
   };
 }
 
@@ -362,6 +412,45 @@ function getRequestErrorMessage(error: unknown, fallback: string): string {
   return error instanceof RequestError && error.detail !== null ? error.detail : fallback;
 }
 
+function createClientSessionId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function buildHistorySession(
+  exercise: GeneratedExercise,
+  analysis: RecordingAnalysisResult['analysis'],
+): HistorySession {
+  return {
+    id: createClientSessionId(),
+    created_at: new Date().toISOString(),
+    language: exercise.language,
+    topic_prompt: exercise.topic_prompt === '' ? null : exercise.topic_prompt,
+    text: exercise.text,
+    analysis,
+  };
+}
+
+async function loadHistory(fetchImpl: typeof fetch): Promise<HistoryStore> {
+  return await requestJson<HistoryStore>(fetchImpl, '/api/history', { method: 'GET' });
+}
+
+async function loadHistorySession(fetchImpl: typeof fetch, sessionId: string): Promise<HistorySession> {
+  return await requestJson<HistorySession>(fetchImpl, `/api/history/${sessionId}`, { method: 'GET' });
+}
+
+async function saveHistorySession(
+  fetchImpl: typeof fetch,
+  session: HistorySession,
+): Promise<HistoryStore> {
+  return await requestJson<HistoryStore>(fetchImpl, '/api/history', {
+    method: 'POST',
+    body: JSON.stringify(session),
+  });
+}
+
 function render(
   documentRef: Document,
   elements: ShellElements,
@@ -399,8 +488,9 @@ function render(
       'analyzing',
       'review',
     ].includes(model.flow);
-  elements.setupScreen.hidden = hasExercise;
-  elements.exerciseScreen.hidden = !hasExercise;
+  elements.historyScreen.hidden = model.flow !== 'history';
+  elements.setupScreen.hidden = hasExercise || model.flow === 'history';
+  elements.exerciseScreen.hidden = !hasExercise || model.flow === 'history';
   elements.generateButton.disabled = model.flow === 'generating_text';
   elements.reuseTopicButton.disabled = model.flow === 'generating_text';
   elements.recordingControls.hidden = !showRecordingControls;
@@ -416,6 +506,75 @@ function render(
   elements.reviewPace.textContent = model.review?.pace ?? '';
   elements.reviewHesitations.textContent = model.review?.hesitations.join('\n') ?? '';
   elements.reviewRecommendations.textContent = model.review?.recommendations.join('\n') ?? '';
+
+  elements.historySaveError.hidden = model.history_save_error === null;
+  elements.historySaveError.textContent = model.history_save_error ?? '';
+  elements.historyError.hidden = model.history_error === null;
+  elements.historyError.textContent = model.history_error ?? '';
+
+  const sessions = model.history_sessions ?? [];
+  elements.historyEmptyState.hidden = !(model.flow === 'history' && sessions.length === 0 && model.history_error === null);
+
+  const cards = sessions.map((session) => {
+    const card = documentRef.createElement('article');
+    card.className = 'history-card';
+
+    const summary = documentRef.createElement('p');
+    summary.className = 'history-card-copy';
+    summary.textContent = session.analysis.summary[0] ?? 'No summary yet.';
+
+    const meta = documentRef.createElement('p');
+    meta.className = 'history-card-copy';
+    meta.textContent = `${new Date(session.created_at).toLocaleString()} • ${session.language} • ${session.topic_prompt ?? 'No topic'}`;
+
+    const detailsButton = documentRef.createElement('button');
+    detailsButton.type = 'button';
+    detailsButton.className = 'button button-ghost';
+    detailsButton.textContent = 'Open details';
+    detailsButton.addEventListener('click', async () => {
+      try {
+        const detailed = await loadHistorySession(fetchImpl, session.id);
+        model = applyHistoryDetails(model, detailed);
+      } catch {
+        model = applyHistoryError(model, 'Could not load session details. Try again.');
+      }
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    });
+
+    const reuseButton = documentRef.createElement('button');
+    reuseButton.type = 'button';
+    reuseButton.className = 'button button-secondary';
+    reuseButton.textContent = 'Reuse topic';
+    reuseButton.disabled = !session.topic_prompt;
+    reuseButton.addEventListener('click', () => {
+      if (!session.topic_prompt) {
+        return;
+      }
+      clearRecordingArtifacts();
+      model = reuseTopic(model, session.topic_prompt);
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    });
+
+    const actions = documentRef.createElement('div');
+    actions.className = 'history-card-actions';
+    actions.append(detailsButton, reuseButton);
+
+    card.append(meta, summary, actions);
+    return card;
+  });
+  elements.historyList.replaceChildren(...cards);
+
+  const selected = model.selected_history_session;
+  elements.historyDetailSummary.textContent = selected?.analysis.summary.join(' ') ?? 'Select a session to inspect its review details.';
+  elements.historyDetailMeta.textContent = selected ? `${selected.language} • ${selected.topic_prompt ?? 'No topic'}` : '';
+  elements.historyDetailText.textContent = selected?.text ?? '';
+  elements.historyDetailClarity.textContent = selected ? `Clarity score: ${selected.analysis.clarity_score}` : '';
+  elements.historyDetailPace.textContent = selected ? `Pace score: ${selected.analysis.pace_score}` : '';
+  elements.historyDetailHesitations.textContent = selected
+    ? selected.analysis.hesitations.map((h) => `${h.note} (${h.start.toFixed(1)}s-${h.end.toFixed(1)}s)`).join('\n')
+    : '';
+  elements.historyDetailReuseTopicButton.disabled = !selected?.topic_prompt;
+  elements.historyRetryButton.hidden = model.history_error === null;
 
   if (model.recording_error) {
     elements.recordingStatus.textContent = model.recording_error;
@@ -666,11 +825,21 @@ export async function startApp(
         });
         formData.append('metadata', metadata);
       }
-      const review = await requestJson<RecordingReview>(fetchImpl, '/api/analyze-recording', {
+      const result = await requestJson<RecordingAnalysisResult>(fetchImpl, '/api/analyze-recording', {
         method: 'POST',
         body: formData,
       });
-      model = applyAnalysisResult(model, review);
+      const latestSession = buildHistorySession(model.generated_exercise!, result.analysis);
+      model = applyAnalysisResult(model, result, latestSession);
+      try {
+        const history = await saveHistorySession(fetchImpl, latestSession);
+        model = applyHistoryLoaded(model, history);
+      } catch {
+        model = applyHistorySaveError(
+          model,
+          'Review is ready, but this session was not saved to history.',
+        );
+      }
     } catch {
       model = applyAnalysisError(model, 'Could not upload the recording. Try again.');
     }
@@ -711,6 +880,66 @@ export async function startApp(
     } catch {
       elements.settingsStatus.textContent = CLEAR_ERROR_STATUS;
     }
+  });
+
+  for (const button of elements.newSessionButtons) {
+    button.addEventListener('click', () => {
+      reuseNextGeneration = false;
+      clearRecordingArtifacts();
+      model = startNewSession(model);
+      render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    });
+  }
+
+  elements.reviewReuseTopicButton.addEventListener('click', () => {
+    const topicPrompt = model.latest_session?.topic_prompt ?? '';
+    if (topicPrompt === '') {
+      return;
+    }
+    clearRecordingArtifacts();
+    model = reuseTopic(model, topicPrompt);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+  });
+
+  elements.openHistoryButton.addEventListener('click', async () => {
+    model = enterHistory(model, model.review !== null ? 'review' : 'home');
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+    try {
+      const history = await loadHistory(fetchImpl);
+      model = applyHistoryLoaded(model, history);
+    } catch {
+      model = applyHistoryError(model, 'Could not load saved history. Try again.');
+    }
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+  });
+
+  elements.historyBackButton.addEventListener('click', () => {
+    model = returnFromHistory(model);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+  });
+
+  elements.historyRetryButton.addEventListener('click', async () => {
+    const selectedId = model.selected_history_session?.id;
+    if (!selectedId) {
+      return;
+    }
+    try {
+      const session = await loadHistorySession(fetchImpl, selectedId);
+      model = applyHistoryDetails(model, session);
+    } catch {
+      model = applyHistoryError(model, 'Could not load session details. Try again.');
+    }
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
+  });
+
+  elements.historyDetailReuseTopicButton.addEventListener('click', () => {
+    const topicPrompt = model.selected_history_session?.topic_prompt ?? '';
+    if (topicPrompt === '') {
+      return;
+    }
+    clearRecordingArtifacts();
+    model = reuseTopic(model, topicPrompt);
+    render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl);
   });
 
   elements.generateButton.addEventListener('click', async () => {

@@ -215,13 +215,15 @@ export function startRecordingAnalysis(model) {
         review: null,
     };
 }
-export function applyAnalysisResult(model, review) {
+export function applyAnalysisResult(model, result, session) {
     return {
         ...model,
         flow: 'review',
         has_recording: true,
         recording_error: null,
-        review,
+        review: result.review,
+        latest_session: session,
+        history_save_error: null,
     };
 }
 export function applyAnalysisError(model, message) {
@@ -231,6 +233,74 @@ export function applyAnalysisError(model, message) {
         has_recording: true,
         recording_error: message,
         review: null,
+    };
+}
+export function applyHistorySaveError(model, message) {
+    return {
+        ...model,
+        history_save_error: message,
+    };
+}
+export function enterHistory(model, origin) {
+    return {
+        ...model,
+        flow: 'history',
+        history_origin: origin,
+        history_error: null,
+    };
+}
+export function applyHistoryLoaded(model, history) {
+    return {
+        ...model,
+        history_sessions: history.sessions,
+        selected_history_session: history.sessions[0] ?? null,
+        history_error: null,
+    };
+}
+export function applyHistoryDetails(model, session) {
+    return {
+        ...model,
+        selected_history_session: session,
+        history_error: null,
+    };
+}
+export function applyHistoryError(model, message) {
+    return {
+        ...model,
+        history_error: message,
+    };
+}
+export function returnFromHistory(model) {
+    return {
+        ...model,
+        flow: model.history_origin === 'review' && model.review !== null ? 'review' : 'home',
+        history_origin: null,
+    };
+}
+export function startNewSession(model) {
+    return {
+        ...model,
+        flow: 'home',
+        generated_exercise: null,
+        has_recording: false,
+        recording_error: null,
+        review: null,
+        latest_session: null,
+        selected_history_session: null,
+        history_error: null,
+        history_save_error: null,
+        history_origin: null,
+        error_message: null,
+    };
+}
+export function reuseTopic(model, topicPrompt) {
+    return {
+        ...startNewSession(model),
+        settings: {
+            ...model.settings,
+            topic_prompt: topicPrompt,
+            reuse_last_topic: false,
+        },
     };
 }
 export function resetRecording(model) {

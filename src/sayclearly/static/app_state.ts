@@ -9,6 +9,7 @@ export type FlowState =
   | 'recorded'
   | 'analyzing'
   | 'review'
+  | 'history'
   | 'error';
 
 type ConfigSource = 'env' | 'stored' | 'none';
@@ -103,6 +104,40 @@ export interface RecordingReview {
   recommendations: string[];
 }
 
+export interface Hesitation {
+  start: number;
+  end: number;
+  note: string;
+}
+
+export interface SessionAnalysis {
+  clarity_score: number;
+  pace_score: number;
+  hesitations: Hesitation[];
+  summary: string[];
+}
+
+export interface HistorySession {
+  id: string;
+  created_at: string;
+  language: string;
+  topic_prompt: string | null;
+  text: string;
+  analysis: SessionAnalysis;
+}
+
+export interface HistoryStore {
+  version: number;
+  sessions: HistorySession[];
+}
+
+export interface RecordingAnalysisResult {
+  review: RecordingReview;
+  analysis: SessionAnalysis;
+}
+
+type HistoryOrigin = 'review' | 'home' | null;
+
 interface GenerateRequest {
   language: string;
   analysis_language: string;
@@ -140,6 +175,12 @@ export interface AppModel {
   has_recording: boolean;
   recording_error: string | null;
   review: RecordingReview | null;
+  latest_session: HistorySession | null;
+  history_sessions: HistorySession[] | null;
+  selected_history_session: HistorySession | null;
+  history_error: string | null;
+  history_save_error: string | null;
+  history_origin: HistoryOrigin;
   error_message: string | null;
 }
 
@@ -195,6 +236,12 @@ export function createInitialAppModel(): AppModel {
     has_recording: false,
     recording_error: null,
     review: null,
+    latest_session: null,
+    history_sessions: null,
+    selected_history_session: null,
+    history_error: null,
+    history_save_error: null,
+    history_origin: null,
     error_message: null,
   };
 }
@@ -364,13 +411,19 @@ export function startRecordingAnalysis(model: AppModel): AppModel {
   };
 }
 
-export function applyAnalysisResult(model: AppModel, review: RecordingReview): AppModel {
+export function applyAnalysisResult(
+  model: AppModel,
+  result: RecordingAnalysisResult,
+  session: HistorySession,
+): AppModel {
   return {
     ...model,
     flow: 'review',
     has_recording: true,
     recording_error: null,
-    review,
+    review: result.review,
+    latest_session: session,
+    history_save_error: null,
   };
 }
 
@@ -381,6 +434,82 @@ export function applyAnalysisError(model: AppModel, message: string): AppModel {
     has_recording: true,
     recording_error: message,
     review: null,
+  };
+}
+
+export function applyHistorySaveError(model: AppModel, message: string): AppModel {
+  return {
+    ...model,
+    history_save_error: message,
+  };
+}
+
+export function enterHistory(model: AppModel, origin: HistoryOrigin): AppModel {
+  return {
+    ...model,
+    flow: 'history',
+    history_origin: origin,
+    history_error: null,
+  };
+}
+
+export function applyHistoryLoaded(model: AppModel, history: HistoryStore): AppModel {
+  return {
+    ...model,
+    history_sessions: history.sessions,
+    selected_history_session: history.sessions[0] ?? null,
+    history_error: null,
+  };
+}
+
+export function applyHistoryDetails(model: AppModel, session: HistorySession): AppModel {
+  return {
+    ...model,
+    selected_history_session: session,
+    history_error: null,
+  };
+}
+
+export function applyHistoryError(model: AppModel, message: string): AppModel {
+  return {
+    ...model,
+    history_error: message,
+  };
+}
+
+export function returnFromHistory(model: AppModel): AppModel {
+  return {
+    ...model,
+    flow: model.history_origin === 'review' && model.review !== null ? 'review' : 'home',
+    history_origin: null,
+  };
+}
+
+export function startNewSession(model: AppModel): AppModel {
+  return {
+    ...model,
+    flow: 'home',
+    generated_exercise: null,
+    has_recording: false,
+    recording_error: null,
+    review: null,
+    latest_session: null,
+    selected_history_session: null,
+    history_error: null,
+    history_save_error: null,
+    history_origin: null,
+    error_message: null,
+  };
+}
+
+export function reuseTopic(model: AppModel, topicPrompt: string): AppModel {
+  return {
+    ...startNewSession(model),
+    settings: {
+      ...model.settings,
+      topic_prompt: topicPrompt,
+      reuse_last_topic: false,
+    },
   };
 }
 
