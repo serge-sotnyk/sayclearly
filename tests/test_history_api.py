@@ -64,6 +64,15 @@ def test_post_history_returns_400_for_invalid_payload_shape(tmp_path: Path) -> N
     assert response.status_code == 400
 
 
+def test_get_history_returns_empty_list_by_default(tmp_path: Path) -> None:
+    client = TestClient(create_app(tmp_path))
+
+    response = client.get("/api/history")
+
+    assert response.status_code == 200
+    assert response.json() == {"version": 1, "sessions": []}
+
+
 def test_post_history_returns_422_for_semantically_invalid_payload(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
     session = make_session("01")
