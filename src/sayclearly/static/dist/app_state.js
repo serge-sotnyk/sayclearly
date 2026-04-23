@@ -70,6 +70,12 @@ export function createInitialAppModel() {
         has_recording: false,
         recording_error: null,
         review: null,
+        latest_session: null,
+        history_sessions: null,
+        selected_history_session: null,
+        history_error: null,
+        history_save_error: null,
+        history_origin: null,
         error_message: null,
     };
 }
