@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sayclearly.recording.models import AudioAnalysisMetadata, RecordingAnalysisResponse
+from sayclearly.recording.models import AudioAnalysisMetadata, RecordingAnalysisResult
 from sayclearly.recording.service import (
     TEMP_RECORDINGS_DIR_NAME,
     EmptyRecordingError,
@@ -12,7 +12,7 @@ from sayclearly.recording.service import (
 from sayclearly.storage.files import CACHE_DIR_NAME
 
 
-def test_analyze_recording_saves_temp_file_and_returns_review(tmp_path: Path) -> None:
+def test_analyze_recording_saves_temp_file_and_returns_review_and_analysis(tmp_path: Path) -> None:
     service = RecordingService(tmp_path)
 
     fake_analysis = MagicMock()
@@ -44,12 +44,16 @@ def test_analyze_recording_saves_temp_file_and_returns_review(tmp_path: Path) ->
 
     assert len(saved_files) == 1
     assert saved_files[0].suffix == ".webm"
-    assert isinstance(response, RecordingAnalysisResponse)
-    assert response.summary
-    assert response.clarity
-    assert response.pace
-    assert response.hesitations
-    assert response.recommendations
+    assert isinstance(response, RecordingAnalysisResult)
+    assert response.review.summary
+    assert response.review.clarity
+    assert response.review.pace
+    assert response.review.hesitations == ["pause (at 1.0s-2.0s)"]
+    assert response.review.recommendations == ["Slow down a little."]
+    assert response.analysis.clarity_score == 72
+    assert response.analysis.pace_score == 65
+    assert response.analysis.summary == ["Tempo increased near the end."]
+    assert response.analysis.hesitations[0].note == "pause"
     fake_client.analyze_audio.assert_called_once()
 
 

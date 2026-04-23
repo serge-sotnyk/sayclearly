@@ -8,62 +8,15 @@ from sayclearly.gemini.client import GeneratedExercise
 from sayclearly.recording.models import StructuredAudioAnalysis
 
 
-def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
+def test_stage_7_happy_path_saves_history_and_reuses_topic(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    exercise_text = (
-        "Order your coffee clearly, then thank the barista with a calm and steady voice."
-    )
+    exercise_text = "Speak clearly about ordering coffee before work."
     monkeypatch.setattr(
         "sayclearly.exercise.service.GeminiClient.generate_exercise",
         lambda self, *, prompt, model, thinking_level: GeneratedExercise(text=exercise_text),
     )
-    client = TestClient(create_app(tmp_path))
-
-    config_response = client.get("/api/config")
-
-    assert config_response.status_code == 200
-    config = config_response.json()
-
-    save_response = client.post(
-        "/api/config",
-        json={
-            "text_language": "en",
-            "analysis_language": "uk",
-            "same_language_for_analysis": False,
-            "ui_language": config["ui_language"],
-            "last_topic_prompt": "Order coffee before work",
-            "session_limit": config["session_limit"],
-            "keep_last_audio": config["keep_last_audio"],
-            "gemini": {
-                "text_model": config["gemini"]["text_model"],
-                "analysis_model": config["gemini"]["analysis_model"],
-                "same_model_for_analysis": config["gemini"]["same_model_for_analysis"],
-                "text_thinking_level": config["gemini"]["text_thinking_level"],
-                "api_key": "stored-key",
-            },
-            "langfuse": {
-                "host": config["langfuse"]["host"],
-                "public_key": None,
-                "secret_key": None,
-            },
-        },
-    )
-
-    assert save_response.status_code == 200
-
-    generate_response = client.post(
-        "/api/generate-text",
-        json={
-            "language": "en",
-            "analysis_language": "uk",
-            "topic_prompt": "",
-            "reuse_last_topic": True,
-        },
-    )
-
-    assert generate_response.status_code == 200
 
     def fake_analyze_audio(
         self,
@@ -88,7 +41,44 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
         fake_analyze_audio,
     )
 
-    analyze_response = client.post(
+    client = TestClient(create_app(tmp_path))
+    config = client.get("/api/config").json()
+    client.post(
+        "/api/config",
+        json={
+            "text_language": "en",
+            "analysis_language": "uk",
+            "same_language_for_analysis": False,
+            "ui_language": config["ui_language"],
+            "last_topic_prompt": "Order coffee before work",
+            "session_limit": config["session_limit"],
+            "keep_last_audio": config["keep_last_audio"],
+            "gemini": {
+                "text_model": config["gemini"]["text_model"],
+                "analysis_model": config["gemini"]["analysis_model"],
+                "same_model_for_analysis": config["gemini"]["same_model_for_analysis"],
+                "text_thinking_level": config["gemini"]["text_thinking_level"],
+                "api_key": "stored-key",
+            },
+            "langfuse": {
+                "host": config["langfuse"]["host"],
+                "public_key": None,
+                "secret_key": None,
+            },
+        },
+    )
+
+    exercise = client.post(
+        "/api/generate-text",
+        json={
+            "language": "en",
+            "analysis_language": "uk",
+            "topic_prompt": "",
+            "reuse_last_topic": True,
+        },
+    ).json()
+
+    analysis = client.post(
         "/api/analyze-recording",
         data={
             "metadata": (
@@ -96,14 +86,33 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
             )
         },
         files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
+    ).json()
+
+    session_payload = {
+        "id": "session-1",
+        "created_at": "2026-04-23T10:12:33Z",
+        "language": exercise["language"],
+        "topic_prompt": exercise["topic_prompt"],
+        "text": exercise["text"],
+        "analysis": analysis["analysis"],
+    }
+    saved = client.post("/api/history", json=session_payload)
+    listed = client.get("/api/history")
+    detail = client.get("/api/history/session-1")
+    reused = client.post(
+        "/api/generate-text",
+        json={
+            "language": "en",
+            "analysis_language": "uk",
+            "topic_prompt": detail.json()["topic_prompt"],
+            "reuse_last_topic": False,
+        },
     )
 
-    assert analyze_response.status_code == 200
-    payload = analyze_response.json()
-    assert payload["review"]["summary"]
-    assert payload["review"]["recommendations"]
-    assert payload["analysis"]["summary"] == ["Good effort."]
-    assert payload["analysis"]["hesitations"][0]["note"] == "pause"
-
-    temp_dir = tmp_path / "cache" / "temporary-recordings"
-    assert len(list(temp_dir.iterdir())) == 1
+    assert saved.status_code == 200
+    assert listed.status_code == 200
+    assert listed.json()["sessions"][0]["id"] == "session-1"
+    assert detail.status_code == 200
+    assert detail.json()["analysis"]["summary"] == ["Good effort."]
+    assert reused.status_code == 200
+    assert reused.json()["topic_prompt"] == "Order coffee before work"

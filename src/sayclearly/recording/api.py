@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import ValidationError
 
-from sayclearly.recording.models import AudioAnalysisMetadata, RecordingAnalysisResponse
+from sayclearly.recording.models import AudioAnalysisMetadata, RecordingAnalysisResult
 from sayclearly.recording.service import (
     EmptyRecordingError,
     RecordingAnalysisInvalidCredentialsError,
@@ -19,11 +19,11 @@ def build_recording_router(data_root: Path | None = None) -> APIRouter:
     service = RecordingService(data_root)
     router = APIRouter()
 
-    @router.post("/api/analyze-recording", response_model=RecordingAnalysisResponse)
+    @router.post("/api/analyze-recording", response_model=RecordingAnalysisResult)
     async def analyze_recording(
         audio: Annotated[UploadFile, File()],
         metadata: Annotated[str, Form()] = "{}",
-    ) -> RecordingAnalysisResponse:
+    ) -> RecordingAnalysisResult:
         try:
             parsed_metadata = AudioAnalysisMetadata.model_validate_json(metadata)
         except ValidationError as exc:

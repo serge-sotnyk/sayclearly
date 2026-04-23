@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from sayclearly.gemini.catalog import sanitize_analysis_model
 from sayclearly.gemini.client import (
     GeminiClient,
@@ -12,7 +14,8 @@ from sayclearly.gemini.client import (
 from sayclearly.gemini.telemetry import GeminiTelemetry
 from sayclearly.recording.models import (
     AudioAnalysisMetadata,
-    RecordingAnalysisResponse,
+    RecordingAnalysisResult,
+    RecordingReview,
     StructuredAudioAnalysis,
 )
 from sayclearly.recording.prompts import (
@@ -26,6 +29,7 @@ from sayclearly.storage.files import (
     load_config,
     load_secrets,
 )
+from sayclearly.storage.models import Hesitation, SessionAnalysis
 
 TEMP_RECORDINGS_DIR_NAME = "temporary-recordings"
 
@@ -68,7 +72,7 @@ class RecordingService:
         filename: str | None,
         content_type: str | None,
         metadata: AudioAnalysisMetadata,
-    ) -> RecordingAnalysisResponse:
+    ) -> RecordingAnalysisResult:
         if not audio_bytes:
             raise EmptyRecordingError("Uploaded recording is empty.")
 
@@ -135,26 +139,30 @@ class RecordingService:
             return stored_api_key.strip()
         return None
 
-    def _normalize_analysis(self, structured: StructuredAudioAnalysis) -> RecordingAnalysisResponse:
-        clarity_text = self._score_to_text(structured.clarity_score, "clarity")
-        pace_text = self._score_to_text(structured.pace_score, "pace")
-        hesitations = [
-            (
-                f"{h['note']} (at {h['start']:.1f}s-{h['end']:.1f}s)"
-                if "start" in h and "end" in h
-                else h.get("note", "")
-            )
-            for h in structured.hesitations
-        ]
-        summary = " ".join(structured.summary) if structured.summary else "Analysis complete."
-
-        return RecordingAnalysisResponse(
-            summary=summary,
-            clarity=clarity_text,
-            pace=pace_text,
-            hesitations=hesitations,
+    def _normalize_analysis(self, structured: StructuredAudioAnalysis) -> RecordingAnalysisResult:
+        analysis_hesitations = []
+        for hesitation in structured.hesitations:
+            try:
+                analysis_hesitations.append(Hesitation.model_validate(hesitation))
+            except ValidationError:
+                continue
+        analysis = SessionAnalysis(
+            clarity_score=structured.clarity_score,
+            pace_score=structured.pace_score,
+            hesitations=analysis_hesitations,
+            summary=structured.summary,
+        )
+        review = RecordingReview(
+            summary=" ".join(structured.summary) if structured.summary else "Analysis complete.",
+            clarity=self._score_to_text(structured.clarity_score, "clarity"),
+            pace=self._score_to_text(structured.pace_score, "pace"),
+            hesitations=[
+                f"{hesitation.note} (at {hesitation.start:.1f}s-{hesitation.end:.1f}s)"
+                for hesitation in analysis_hesitations
+            ],
             recommendations=structured.recommendations,
         )
+        return RecordingAnalysisResult(review=review, analysis=analysis)
 
     def _score_to_text(self, score: int, dimension: str) -> str:
         if score >= 80:
