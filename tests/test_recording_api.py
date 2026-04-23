@@ -4,7 +4,9 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from sayclearly.app import create_app
+from sayclearly.recording.models import RecordingAnalysisResult, RecordingReview
 from sayclearly.storage.files import StorageError
+from sayclearly.storage.models import SessionAnalysis
 
 
 def test_post_analyze_recording_returns_review_and_analysis_with_metadata(tmp_path: Path) -> None:
@@ -12,21 +14,21 @@ def test_post_analyze_recording_returns_review_and_analysis_with_metadata(tmp_pa
 
     with patch(
         "sayclearly.recording.api.RecordingService.analyze_recording",
-        return_value={
-            "review": {
-                "summary": "Good effort.",
-                "clarity": "Clear.",
-                "pace": "Steady.",
-                "hesitations": [],
-                "recommendations": ["Keep practicing."],
-            },
-            "analysis": {
-                "clarity_score": 72,
-                "pace_score": 65,
-                "hesitations": [],
-                "summary": ["Good effort."],
-            },
-        },
+        return_value=RecordingAnalysisResult(
+            review=RecordingReview(
+                summary="Good effort.",
+                clarity="Clear.",
+                pace="Steady.",
+                hesitations=[],
+                recommendations=["Keep practicing."],
+            ),
+            analysis=SessionAnalysis(
+                clarity_score=72,
+                pace_score=65,
+                hesitations=[],
+                summary=["Good effort."],
+            ),
+        ),
     ):
         response = client.post(
             "/api/analyze-recording",
@@ -37,7 +39,10 @@ def test_post_analyze_recording_returns_review_and_analysis_with_metadata(tmp_pa
     assert response.status_code == 200
     payload = response.json()
     assert payload["review"]["summary"] == "Good effort."
+    assert payload["review"]["pace"] == "Steady."
+    assert payload["review"]["recommendations"] == ["Keep practicing."]
     assert payload["analysis"]["clarity_score"] == 72
+    assert payload["analysis"]["pace_score"] == 65
 
 
 def test_post_analyze_recording_returns_400_when_metadata_is_missing(tmp_path: Path) -> None:

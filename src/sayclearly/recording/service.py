@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from sayclearly.gemini.catalog import sanitize_analysis_model
 from sayclearly.gemini.client import (
     GeminiClient,
@@ -138,9 +140,12 @@ class RecordingService:
         return None
 
     def _normalize_analysis(self, structured: StructuredAudioAnalysis) -> RecordingAnalysisResult:
-        analysis_hesitations = [
-            Hesitation.model_validate(hesitation) for hesitation in structured.hesitations
-        ]
+        analysis_hesitations = []
+        for hesitation in structured.hesitations:
+            try:
+                analysis_hesitations.append(Hesitation.model_validate(hesitation))
+            except ValidationError:
+                continue
         analysis = SessionAnalysis(
             clarity_score=structured.clarity_score,
             pace_score=structured.pace_score,
@@ -152,11 +157,7 @@ class RecordingService:
             clarity=self._score_to_text(structured.clarity_score, "clarity"),
             pace=self._score_to_text(structured.pace_score, "pace"),
             hesitations=[
-                (
-                    f"{hesitation.note} (at {hesitation.start:.1f}s-{hesitation.end:.1f}s)"
-                    if hesitation.end >= hesitation.start
-                    else hesitation.note
-                )
+                f"{hesitation.note} (at {hesitation.start:.1f}s-{hesitation.end:.1f}s)"
                 for hesitation in analysis_hesitations
             ],
             recommendations=structured.recommendations,

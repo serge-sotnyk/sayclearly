@@ -48,6 +48,7 @@ def test_analyze_recording_saves_temp_file_and_returns_review_and_analysis(tmp_p
     assert response.review.summary
     assert response.review.clarity
     assert response.review.pace
+    assert response.review.hesitations == ["pause (at 1.0s-2.0s)"]
     assert response.review.recommendations == ["Slow down a little."]
     assert response.analysis.clarity_score == 72
     assert response.analysis.pace_score == 65
