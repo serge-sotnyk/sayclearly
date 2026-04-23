@@ -64,14 +64,20 @@ select {
 }
 
 .shell-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(16rem, 0.8fr);
+    display: flex;
     gap: 1rem;
-    align-items: start;
+    align-items: flex-start;
 }
 
 .screen-panel {
-    grid-column: span 2;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+}
+
+.settings-panel {
+    flex: 0 0 16rem;
+    min-width: 16rem;
 }
 
 .panel-heading {
@@ -233,7 +239,13 @@ audio[data-recording-preview] {
 
 @media (max-width: 960px) {
     .shell-grid {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+    }
+
+    .settings-panel {
+        flex: 1 1 auto;
+        min-width: auto;
+        width: 100%;
     }
 }
 
