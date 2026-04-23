@@ -7,17 +7,25 @@ from sayclearly.app import create_app
 from sayclearly.storage.files import StorageError
 
 
-def test_post_analyze_recording_returns_review_with_metadata(tmp_path: Path) -> None:
+def test_post_analyze_recording_returns_review_and_analysis_with_metadata(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
 
     with patch(
         "sayclearly.recording.api.RecordingService.analyze_recording",
         return_value={
-            "summary": "Good effort.",
-            "clarity": "Clear.",
-            "pace": "Steady.",
-            "hesitations": [],
-            "recommendations": ["Keep practicing."],
+            "review": {
+                "summary": "Good effort.",
+                "clarity": "Clear.",
+                "pace": "Steady.",
+                "hesitations": [],
+                "recommendations": ["Keep practicing."],
+            },
+            "analysis": {
+                "clarity_score": 72,
+                "pace_score": 65,
+                "hesitations": [],
+                "summary": ["Good effort."],
+            },
         },
     ):
         response = client.post(
@@ -28,9 +36,8 @@ def test_post_analyze_recording_returns_review_with_metadata(tmp_path: Path) -> 
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["summary"]
-    assert payload["clarity"]
-    assert payload["pace"]
+    assert payload["review"]["summary"] == "Good effort."
+    assert payload["analysis"]["clarity_score"] == 72
 
 
 def test_post_analyze_recording_returns_400_when_metadata_is_missing(tmp_path: Path) -> None:

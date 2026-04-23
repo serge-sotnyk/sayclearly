@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+from sayclearly.storage.models import SessionAnalysis
+
 
 class AudioAnalysisMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -19,7 +21,7 @@ class StructuredAudioAnalysis(BaseModel):
     recommendations: list[str] = Field(default_factory=list)
 
 
-class RecordingAnalysisResponse(BaseModel):
+class RecordingReview(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: str
@@ -27,3 +29,10 @@ class RecordingAnalysisResponse(BaseModel):
     pace: str
     hesitations: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
+
+
+class RecordingAnalysisResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    review: RecordingReview
+    analysis: SessionAnalysis

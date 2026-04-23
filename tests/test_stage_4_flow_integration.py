@@ -100,8 +100,10 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
 
     assert analyze_response.status_code == 200
     payload = analyze_response.json()
-    assert payload["summary"]
-    assert payload["recommendations"]
+    assert payload["review"]["summary"]
+    assert payload["review"]["recommendations"]
+    assert payload["analysis"]["summary"] == ["Good effort."]
+    assert payload["analysis"]["hesitations"][0]["note"] == "pause"
 
     temp_dir = tmp_path / "cache" / "temporary-recordings"
     assert len(list(temp_dir.iterdir())) == 1
