@@ -7,6 +7,7 @@ from sayclearly.recording.models import AudioAnalysisMetadata, RecordingAnalysis
 from sayclearly.recording.service import (
     TEMP_RECORDINGS_DIR_NAME,
     EmptyRecordingError,
+    RecordingAnalysisProviderError,
     RecordingService,
 )
 from sayclearly.storage.files import CACHE_DIR_NAME
@@ -40,10 +41,8 @@ def test_analyze_recording_saves_temp_file_and_returns_review_and_analysis(tmp_p
     )
 
     temp_dir = tmp_path / CACHE_DIR_NAME / TEMP_RECORDINGS_DIR_NAME
-    saved_files = list(temp_dir.iterdir())
 
-    assert len(saved_files) == 1
-    assert saved_files[0].suffix == ".webm"
+    assert list(temp_dir.iterdir()) == []
     assert isinstance(response, RecordingAnalysisResult)
     assert response.review.summary
     assert response.review.clarity
@@ -57,7 +56,7 @@ def test_analyze_recording_saves_temp_file_and_returns_review_and_analysis(tmp_p
     fake_client.analyze_audio.assert_called_once()
 
 
-def test_analyze_recording_keeps_only_newest_temp_file(tmp_path: Path) -> None:
+def test_analyze_recording_deletes_temp_file_after_success(tmp_path: Path) -> None:
     service = RecordingService(tmp_path)
     fake_client = MagicMock()
     fake_client.analyze_audio.return_value = MagicMock(
@@ -71,23 +70,33 @@ def test_analyze_recording_keeps_only_newest_temp_file(tmp_path: Path) -> None:
     metadata = AudioAnalysisMetadata(language="uk", analysis_language="uk", exercise_text="Text.")
 
     service.analyze_recording(
-        audio_bytes=b"first file",
-        filename="first.webm",
-        content_type="audio/webm",
-        metadata=metadata,
-    )
-    service.analyze_recording(
-        audio_bytes=b"second file",
-        filename="second.webm",
+        audio_bytes=b"temp bytes",
+        filename="sample.webm",
         content_type="audio/webm",
         metadata=metadata,
     )
 
     temp_dir = tmp_path / CACHE_DIR_NAME / TEMP_RECORDINGS_DIR_NAME
-    saved_files = list(temp_dir.iterdir())
+    assert list(temp_dir.iterdir()) == []
 
-    assert len(saved_files) == 1
-    assert saved_files[0].read_bytes() == b"second file"
+
+def test_analyze_recording_deletes_temp_file_after_provider_failure(tmp_path: Path) -> None:
+    service = RecordingService(tmp_path)
+    fake_client = MagicMock()
+    fake_client.analyze_audio.side_effect = RuntimeError("provider down")
+    service._gemini_client = fake_client
+    metadata = AudioAnalysisMetadata(language="uk", analysis_language="uk", exercise_text="Text.")
+
+    with pytest.raises(RecordingAnalysisProviderError, match="unavailable"):
+        service.analyze_recording(
+            audio_bytes=b"temp bytes",
+            filename="sample.webm",
+            content_type="audio/webm",
+            metadata=metadata,
+        )
+
+    temp_dir = tmp_path / CACHE_DIR_NAME / TEMP_RECORDINGS_DIR_NAME
+    assert list(temp_dir.iterdir()) == []
 
 
 def test_analyze_recording_rejects_empty_upload(tmp_path: Path) -> None:
