@@ -143,3 +143,4 @@ def test_home_page_renders_stage_8_trust_copy() -> None:
     assert "Bring your own Gemini API key." in response.text
     assert "Recordings are temporary and are deleted after each analysis attempt." in response.text
     assert "data-telemetry-note" in response.text
+    assert "data-local-storage-note" in response.text
