@@ -73,6 +73,31 @@ const review = {
   recommendations: ['Slow down after the first sentence', 'Finish final consonants more clearly'],
 };
 
+const analysisResult = {
+  review,
+  analysis: {
+    clarity_score: 78,
+    pace_score: 61,
+    hesitations: [
+      {
+        start: 9.3,
+        end: 10.1,
+        note: 'Paused before the last sentence',
+      },
+    ],
+    summary: ['Strong retelling with a few rushed phrases.'],
+  },
+};
+
+const savedSession = {
+  id: 'session-1',
+  created_at: '2026-04-24T09:30:00Z',
+  language: 'uk',
+  topic_prompt: 'Morning routines',
+  text: 'Wake up, stretch, and greet the day clearly.',
+  analysis: analysisResult.analysis,
+};
+
 function createRetellingReadyModel() {
   const exercise = {
     language: 'uk',
@@ -294,7 +319,11 @@ test('applyAnalysisError clears stale review data and preserves the recording fl
   const recordedModel = storeRecordedAudio(
     markRecordingStarted(startRecordingRequest(createRetellingReadyModel())),
   );
-  const reviewedModel = applyAnalysisResult(startRecordingAnalysis(recordedModel), review);
+  const reviewedModel = applyAnalysisResult(
+    startRecordingAnalysis(recordedModel),
+    analysisResult,
+    savedSession,
+  );
   const analyzingModel = startRecordingAnalysis(reviewedModel);
 
   assert.equal(analyzingModel.review, null);
@@ -311,12 +340,17 @@ test('applyAnalysisResult enters review and resetRecording clears recording stat
   const recordedModel = storeRecordedAudio(
     markRecordingStarted(startRecordingRequest(createRetellingReadyModel())),
   );
-  const reviewedModel = applyAnalysisResult(startRecordingAnalysis(recordedModel), review);
+  const reviewedModel = applyAnalysisResult(
+    startRecordingAnalysis(recordedModel),
+    analysisResult,
+    savedSession,
+  );
   const resetModel = resetRecording(reviewedModel);
 
   assert.equal(reviewedModel.flow, 'review');
   assert.equal(reviewedModel.has_recording, true);
   assert.deepEqual(reviewedModel.review, review);
+  assert.deepEqual(reviewedModel.latest_session, savedSession);
   assert.equal(reviewedModel.recording_error, null);
 
   assert.equal(resetModel.flow, 'step_3_retell_ready');
