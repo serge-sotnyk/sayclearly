@@ -154,7 +154,9 @@ def test_main_does_not_load_parent_dotenv_when_cwd_has_no_env(monkeypatch, tmp_p
 def test_readme_documents_mvp_uvx_launch_path() -> None:
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
     pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
-    bundle = Path(__file__).resolve().parents[1] / "src" / "sayclearly" / "static" / "dist" / "app.js"
+    bundle = (
+        Path(__file__).resolve().parents[1] / "src" / "sayclearly" / "static" / "dist" / "app.js"
+    )
 
     assert "uvx --from git+https://github.com/serge-sotnyk/sayclearly sayclearly" in readme
     assert "uv run sayclearly" in readme

@@ -178,5 +178,3 @@ class RecordingService:
         if score >= 40:
             return f"The {dimension} needs some attention."
         return f"The {dimension} needs significant work."
-
-
