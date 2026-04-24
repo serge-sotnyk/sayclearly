@@ -87,8 +87,6 @@ class RecordingService:
         except OSError as exc:
             raise StorageError(f"Could not write {path}") from exc
 
-        self._remove_older_files(temp_dir, keep_path=path)
-
         config = load_config(self.data_root)
         client = self._gemini_client or self._build_gemini_client()
 
@@ -119,8 +117,16 @@ class RecordingService:
             raise RecordingAnalysisProviderError(
                 "Analysis is unavailable right now. Please try again."
             ) from exc
+        finally:
+            self._delete_temp_file(path)
 
         return self._normalize_analysis(structured)
+
+    def _delete_temp_file(self, path: Path) -> None:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            return
 
     def _build_gemini_client(self) -> GeminiClient:
         api_key = self._resolve_gemini_api_key()
@@ -172,12 +178,3 @@ class RecordingService:
         if score >= 40:
             return f"The {dimension} needs some attention."
         return f"The {dimension} needs significant work."
-
-    def _remove_older_files(self, temp_dir: Path, keep_path: Path) -> None:
-        for candidate in temp_dir.iterdir():
-            if candidate == keep_path:
-                continue
-            try:
-                candidate.unlink()
-            except OSError:
-                continue

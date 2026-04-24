@@ -94,13 +94,18 @@ class FakeElement {
 }
 
 class FakeRoot extends FakeElement {
-  constructor(elements) {
+  constructor(elements, collections = new Map()) {
     super();
     this.elements = elements;
+    this.collections = collections;
   }
 
   querySelector(selector) {
     return this.elements.get(selector) ?? null;
+  }
+
+  querySelectorAll(selector) {
+    return this.collections.get(selector) ?? [];
   }
 }
 
@@ -205,12 +210,38 @@ function createExercise(overrides = {}) {
   };
 }
 
+function createAnalysis(overrides = {}) {
+  return {
+    clarity_score: 72,
+    pace_score: 65,
+    hesitations: [
+      {
+        start: 12.4,
+        end: 13.1,
+        note: 'A short pause before the final sentence.',
+      },
+    ],
+    summary: ['Clear retelling with a few rushed transitions.'],
+    ...overrides,
+  };
+}
+
+function createHistoryStore(sessions = []) {
+  return {
+    version: 1,
+    sessions,
+  };
+}
+
 function createShell() {
+  const reviewNewSessionButton = new FakeElement();
+  const historyNewSessionButton = new FakeElement();
   const elements = new Map([
     ['[data-open-settings-button]', new FakeElement()],
     ['[data-status-message]', new FakeElement({ textContent: 'Ready to generate a guided exercise.' })],
     ['[data-screen="setup"]', new FakeElement()],
     ['[data-screen="exercise"]', new FakeElement()],
+    ['[data-screen="history"]', new FakeElement({ hidden: true })],
     ['[data-settings-panel]', new FakeElement({ hidden: true })],
     ['[data-api-key-input]', new FakeElement()],
     ['[data-api-key-hint]', new FakeElement()],
@@ -243,12 +274,34 @@ function createShell() {
     ['[data-review-pace]', new FakeElement()],
     ['[data-review-hesitations]', new FakeElement()],
     ['[data-review-recommendations]', new FakeElement()],
+    ['[data-review-actions]', new FakeElement({ hidden: true })],
+    ['[data-review-reuse-topic-button]', new FakeElement()],
+    ['[data-open-history-button]', new FakeElement()],
+    ['[data-history-list]', new FakeElement()],
+    ['[data-history-empty-state]', new FakeElement({ hidden: true })],
+    ['[data-history-error]', new FakeElement({ hidden: true })],
+    ['[data-history-save-error]', new FakeElement({ hidden: true })],
+    ['[data-history-retry-button]', new FakeElement({ hidden: true })],
+    ['[data-history-back-button]', new FakeElement()],
+    ['[data-history-details]', new FakeElement()],
+    ['[data-history-detail-summary]', new FakeElement()],
+    ['[data-history-detail-meta]', new FakeElement()],
+    ['[data-history-detail-text]', new FakeElement()],
+    ['[data-history-detail-clarity]', new FakeElement()],
+    ['[data-history-detail-pace]', new FakeElement()],
+    ['[data-history-detail-hesitations]', new FakeElement()],
+    ['[data-history-detail-reuse-topic-button]', new FakeElement({ disabled: true })],
     ['[data-settings-status]', new FakeElement()],
     ['[data-clear-api-key-button]', new FakeElement()],
     ['[data-close-settings-button]', new FakeElement()],
+    ['[data-local-storage-note]', new FakeElement()],
+    ['[data-telemetry-note]', new FakeElement()],
   ]);
 
-  const root = new FakeRoot(elements);
+  const root = new FakeRoot(
+    elements,
+    new Map([['[data-new-session-button]', [reviewNewSessionButton, historyNewSessionButton]]]),
+  );
   const document = {
     createElement() {
       return new FakeElement();
@@ -814,11 +867,16 @@ test('startApp records, uploads, renders review, and clears review on record aga
     hesitations: ['A short pause before the final sentence.'],
     recommendations: ['Slow down the ending.', 'Keep sentence openings steady.'],
   };
+  const analysisResult = {
+    review,
+    analysis: createAnalysis(),
+  };
   const { fetchStub, calls } = createFetchStub(
     createResponse(config),
     createResponse(config),
     createResponse(exercise),
-    createResponse(review),
+    createResponse(analysisResult),
+    createResponse(createHistoryStore()),
   );
   const recordingApi = createRecordingApi();
 
@@ -838,6 +896,7 @@ test('startApp records, uploads, renders review, and clears review on record aga
   await shell.elements.get('[data-analyze-recording-button]').click();
 
   assert.equal(calls[3].url, '/api/analyze-recording');
+  assert.equal(calls[4].url, '/api/history');
   assert.equal(shell.elements.get('[data-review-panel]').hidden, false);
   assert.equal(shell.elements.get('[data-review-summary]').textContent, review.summary);
 
@@ -952,4 +1011,31 @@ test('startApp preserves the recorded retelling when upload fails', async () => 
   assert.equal(shell.elements.get('[data-recording-preview]').hidden, false);
   assert.equal(shell.elements.get('[data-analyze-recording-button]').hidden, false);
   assert.match(shell.elements.get('[data-recording-status]').textContent, /could not upload/i);
+});
+
+test('startApp renders local storage and optional telemetry copy from config', async () => {
+  const shell = createShell();
+  const config = createConfig({
+    gemini: {
+      ...createConfig().gemini,
+      has_api_key: true,
+      api_key_source: 'env',
+    },
+    langfuse: {
+      host: 'https://langfuse.example',
+      enabled: true,
+      has_public_key: true,
+      has_secret_key: true,
+      public_key_source: 'stored',
+      secret_key_source: 'stored',
+    },
+  });
+  const { fetchStub } = createFetchStub(createResponse(config));
+
+  await startApp(shell.document, fetchStub);
+
+  assert.match(shell.elements.get('[data-local-storage-note]').textContent, /locally on your machine/i);
+  assert.match(shell.elements.get('[data-local-storage-note]').textContent, /environment/i);
+  assert.match(shell.elements.get('[data-telemetry-note]').textContent, /telemetry is active/i);
+  assert.match(shell.elements.get('[data-telemetry-note]').textContent, /Langfuse/i);
 });

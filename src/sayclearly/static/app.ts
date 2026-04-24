@@ -161,6 +161,8 @@ interface ShellElements {
   historyDetailPace: HTMLElement;
   historyDetailHesitations: HTMLElement;
   historyDetailReuseTopicButton: HTMLButtonElement;
+  localStorageNote: HTMLElement;
+  telemetryNote: HTMLElement;
 }
 
 function createDefaultRecordingApi(): RecordingApi {
@@ -259,6 +261,8 @@ function collectShellElements(root: RootLike): ShellElements {
       root,
       '[data-history-detail-reuse-topic-button]',
     ),
+    localStorageNote: getRequiredElement(root, '[data-local-storage-note]'),
+    telemetryNote: getRequiredElement(root, '[data-telemetry-note]'),
   };
 }
 
@@ -319,6 +323,26 @@ function getApiKeyPlaceholder(config: PublicConfig): string {
   }
 
   return 'Paste your local API key';
+}
+
+function getLocalStorageNote(config: PublicConfig): string {
+  if (config.gemini.api_key_source === 'env') {
+    return 'Runs fully locally on your machine. Bring your own Gemini API key. The current key comes from environment variables for this session.';
+  }
+
+  if (config.gemini.has_api_key) {
+    return 'Runs fully locally on your machine. Bring your own Gemini API key. The current key is stored only in your local config on this computer.';
+  }
+
+  return 'Runs fully locally on your machine. Bring your own Gemini API key. Add it here or through .env for this session.';
+}
+
+function getTelemetryNote(config: PublicConfig): string {
+  if (config.langfuse.enabled) {
+    return 'Optional telemetry is active because Langfuse is configured in this environment.';
+  }
+
+  return 'Optional telemetry stays off unless Langfuse is configured.';
 }
 
 function getStatusMessage(model: AppModel, reuseNextGeneration: boolean): string {
@@ -477,6 +501,8 @@ function render(
   elements.settingsStatus.textContent = getSettingsStatus(model.config);
   elements.apiKeyHint.textContent = getApiKeyHint(model.config);
   elements.apiKeyInput.placeholder = getApiKeyPlaceholder(model.config);
+  elements.localStorageNote.textContent = getLocalStorageNote(model.config);
+  elements.telemetryNote.textContent = getTelemetryNote(model.config);
   elements.statusMessage.textContent = getStatusMessage(model, reuseNextGeneration);
   elements.settingsPanel.hidden = !isSettingsOpen;
 

@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 from sayclearly.app import create_app
 from sayclearly.gemini.client import GeneratedExercise
 from sayclearly.recording.models import StructuredAudioAnalysis
+from sayclearly.recording.service import TEMP_RECORDINGS_DIR_NAME
+from sayclearly.storage.files import CACHE_DIR_NAME
 
 
 def test_stage_7_happy_path_saves_history_and_reuses_topic(
@@ -42,6 +44,7 @@ def test_stage_7_happy_path_saves_history_and_reuses_topic(
     )
 
     client = TestClient(create_app(tmp_path))
+    temp_dir = tmp_path / CACHE_DIR_NAME / TEMP_RECORDINGS_DIR_NAME
     config = client.get("/api/config").json()
     client.post(
         "/api/config",
@@ -87,6 +90,9 @@ def test_stage_7_happy_path_saves_history_and_reuses_topic(
         },
         files={"audio": ("sample.webm", b"fake webm bytes", "audio/webm")},
     ).json()
+
+    assert analysis["review"]["summary"]
+    assert not temp_dir.exists() or list(temp_dir.iterdir()) == []
 
     session_payload = {
         "id": "session-1",

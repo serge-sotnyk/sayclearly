@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 from sayclearly.app import create_app
 from sayclearly.gemini.client import GeneratedExercise
 from sayclearly.recording.models import StructuredAudioAnalysis
+from sayclearly.recording.service import TEMP_RECORDINGS_DIR_NAME
+from sayclearly.storage.files import CACHE_DIR_NAME
 
 
 def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
@@ -105,5 +107,5 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
     assert payload["analysis"]["summary"] == ["Good effort."]
     assert payload["analysis"]["hesitations"][0]["note"] == "pause"
 
-    temp_dir = tmp_path / "cache" / "temporary-recordings"
-    assert len(list(temp_dir.iterdir())) == 1
+    temp_dir = tmp_path / CACHE_DIR_NAME / TEMP_RECORDINGS_DIR_NAME
+    assert not temp_dir.exists() or list(temp_dir.iterdir()) == []

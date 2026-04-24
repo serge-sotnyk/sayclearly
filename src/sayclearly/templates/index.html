@@ -20,6 +20,12 @@
         <p class="lead">
           Prepare a topic, move through each speaking step, and keep the session setup close at hand.
         </p>
+        <p class="field-hint" data-local-storage-note>
+          Runs fully locally on your machine. Bring your own Gemini API key.
+        </p>
+        <p class="field-hint">
+          Recordings are temporary and are deleted after each analysis attempt.
+        </p>
       </section>
 
       <section class="status-banner panel" aria-live="polite">
@@ -202,6 +208,9 @@
           </div>
 
           <p class="settings-status" data-settings-status>API key status: not checked yet.</p>
+          <p class="field-hint" data-telemetry-note>
+            Optional telemetry stays off unless Langfuse is configured.
+          </p>
 
           <div class="settings-actions">
             <button type="button" class="button button-secondary" data-clear-api-key-button>Clear stored API key</button>
