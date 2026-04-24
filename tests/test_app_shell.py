@@ -131,3 +131,15 @@ def test_home_page_keeps_review_actions_hidden_until_review_state() -> None:
 
     assert response.status_code == 200
     assert "data-review-actions hidden" in response.text
+
+
+def test_home_page_renders_stage_8_trust_copy() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Runs fully locally on your machine." in response.text
+    assert "Bring your own Gemini API key." in response.text
+    assert "Recordings are temporary and are deleted after each analysis attempt." in response.text
+    assert "data-telemetry-note" in response.text
