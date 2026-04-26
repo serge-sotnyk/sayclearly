@@ -255,14 +255,22 @@ function createShell() {
     ['[data-topic-input]', new FakeElement()],
     ['[data-reuse-topic-button]', new FakeElement()],
     ['[data-generate-button]', new FakeElement()],
+    ['[data-generate-spinner]', new FakeElement({ hidden: true })],
+    ['[data-generate-label]', new FakeElement({ textContent: 'Generate' })],
+    ['[data-cancel-generate-button]', new FakeElement({ hidden: true })],
+    ['[data-api-key-popover]', new FakeElement()],
+    ['[data-info-popover-toggle]', new FakeElement()],
     ['[data-step-label]', new FakeElement()],
     ['[data-step-title]', new FakeElement()],
     ['[data-step-instruction]', new FakeElement()],
     ['[data-exercise-text]', new FakeElement()],
+    ['[data-step3-details]', new FakeElement()],
     ['[data-reset-button]', new FakeElement()],
     ['[data-next-step-button]', new FakeElement()],
     ['[data-recording-controls]', new FakeElement({ hidden: true })],
     ['[data-recording-status]', new FakeElement()],
+    ['[data-recording-status-text]', new FakeElement()],
+    ['[data-recording-timer]', new FakeElement({ hidden: true })],
     ['[data-start-recording-button]', new FakeElement()],
     ['[data-stop-recording-button]', new FakeElement({ hidden: true })],
     ['[data-analyze-recording-button]', new FakeElement({ hidden: true })],
@@ -313,6 +321,8 @@ function createShell() {
 
       return null;
     },
+    addEventListener() {},
+    removeEventListener() {},
   };
 
   return { document, root, elements };
@@ -787,8 +797,8 @@ test('startApp reloads persisted config before saving after the initial config l
     ['/api/config', '/api/config', '/api/config', '/api/generate-text'],
   );
   assert.deepEqual(JSON.parse(calls[2].options.body), {
-    text_language: 'uk',
-    analysis_language: 'uk',
+    text_language: 'English',
+    analysis_language: 'English',
     same_language_for_analysis: true,
     ui_language: 'en',
     last_topic_prompt: 'Fresh topic',
@@ -886,7 +896,7 @@ test('startApp records, uploads, renders review, and clears review on record aga
   await shell.elements.get('[data-next-step-button]').click();
 
   await shell.elements.get('[data-start-recording-button]').click();
-  assert.match(shell.elements.get('[data-recording-status]').textContent, /recording/i);
+  assert.match(shell.elements.get('[data-recording-status-text]').textContent, /recording/i);
 
   await shell.elements.get('[data-stop-recording-button]').click();
   assert.equal(shell.elements.get('[data-recording-preview]').hidden, false);
@@ -1010,7 +1020,7 @@ test('startApp preserves the recorded retelling when upload fails', async () => 
 
   assert.equal(shell.elements.get('[data-recording-preview]').hidden, false);
   assert.equal(shell.elements.get('[data-analyze-recording-button]').hidden, false);
-  assert.match(shell.elements.get('[data-recording-status]').textContent, /could not upload/i);
+  assert.match(shell.elements.get('[data-recording-status-text]').textContent, /could not upload/i);
 });
 
 test('startApp renders local storage and optional telemetry copy from config', async () => {

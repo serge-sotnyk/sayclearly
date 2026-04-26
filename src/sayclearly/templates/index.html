@@ -20,12 +20,6 @@
         <p class="lead">
           Prepare a topic, move through each speaking step, and keep the session setup close at hand.
         </p>
-        <p class="field-hint" data-local-storage-note>
-          Runs fully locally on your machine. Bring your own Gemini API key.
-        </p>
-        <p class="field-hint">
-          Recordings are temporary and are deleted after each analysis attempt.
-        </p>
       </section>
 
       <section class="status-banner panel" aria-live="polite">
@@ -42,7 +36,24 @@
 
           <form class="setup-form">
             <label class="field">
-              <span>Gemini API key</span>
+              <span class="label-with-popover">
+                Gemini API key
+                <span class="info-popover" data-api-key-popover>
+                  <button
+                    type="button"
+                    class="info-popover-trigger"
+                    aria-label="About the API key and local-only operation"
+                    aria-expanded="false"
+                    data-info-popover-toggle
+                  >?</button>
+                  <span class="info-popover-body" role="tooltip" data-info-popover-body>
+                    <span data-local-storage-note>
+                      Runs fully locally on your machine. Bring your own Gemini API key.
+                    </span>
+                    <span>Recordings are temporary and are deleted after each analysis attempt.</span>
+                  </span>
+                </span>
+              </span>
               <input type="password" name="api-key" autocomplete="off" placeholder="Paste your local API key" data-api-key-input />
             </label>
             <p class="field-hint" data-api-key-hint>Paste a key here or use .env for local development.</p>
@@ -73,12 +84,54 @@
 
             <label class="field">
               <span>Text language</span>
-              <input type="text" name="text-language" value="uk" data-text-language-input />
+              <select name="text-language" data-text-language-input>
+                <option value="English">English</option>
+                <option value="Ukrainian">Ukrainian</option>
+                <option value="Russian">Russian</option>
+                <option value="German">German</option>
+                <option value="French">French</option>
+                <option value="Spanish">Spanish</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="Italian">Italian</option>
+                <option value="Polish">Polish</option>
+                <option value="Dutch">Dutch</option>
+                <option value="Czech">Czech</option>
+                <option value="Turkish">Turkish</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+                <option value="Korean">Korean</option>
+                <option value="Hindi">Hindi</option>
+                <option value="Arabic">Arabic</option>
+                <option value="Hebrew">Hebrew</option>
+                <option value="Vietnamese">Vietnamese</option>
+                <option value="Indonesian">Indonesian</option>
+              </select>
             </label>
 
             <label class="field">
               <span>Analysis language</span>
-              <input type="text" name="analysis-language" value="uk" data-analysis-language-input />
+              <select name="analysis-language" data-analysis-language-input>
+                <option value="English">English</option>
+                <option value="Ukrainian">Ukrainian</option>
+                <option value="Russian">Russian</option>
+                <option value="German">German</option>
+                <option value="French">French</option>
+                <option value="Spanish">Spanish</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="Italian">Italian</option>
+                <option value="Polish">Polish</option>
+                <option value="Dutch">Dutch</option>
+                <option value="Czech">Czech</option>
+                <option value="Turkish">Turkish</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+                <option value="Korean">Korean</option>
+                <option value="Hindi">Hindi</option>
+                <option value="Arabic">Arabic</option>
+                <option value="Hebrew">Hebrew</option>
+                <option value="Vietnamese">Vietnamese</option>
+                <option value="Indonesian">Indonesian</option>
+              </select>
             </label>
 
             <label class="toggle-field">
@@ -93,7 +146,11 @@
 
             <div class="button-row">
               <button type="button" class="button button-secondary" data-reuse-topic-button>Reuse topic</button>
-              <button type="button" class="button button-primary" data-generate-button>Generate</button>
+              <button type="button" class="button button-primary" data-generate-button>
+                <span class="spinner" aria-hidden="true" data-generate-spinner hidden></span>
+                <span data-generate-label>Generate</span>
+              </button>
+              <button type="button" class="button button-ghost" hidden data-cancel-generate-button>Cancel</button>
             </div>
           </form>
         </section>
@@ -105,16 +162,25 @@
             <p class="step-instruction" data-step-instruction>Read the text very slowly and over-articulate every consonant and word ending.</p>
           </div>
 
-          <div class="exercise-text" aria-live="polite" data-exercise-text>
-            Your generated exercise text will appear here when the frontend bundle is connected.
-          </div>
+          <details class="exercise-text-disclosure" data-step3-details open>
+            <summary>Show text</summary>
+            <div class="exercise-text" aria-live="polite" data-exercise-text>
+              Your generated exercise text will appear here when the frontend bundle is connected.
+            </div>
+          </details>
 
           <div class="recording-panel" data-recording-controls>
-            <p class="recording-status" data-recording-status>Recording controls will appear here when the frontend bundle is connected.</p>
+            <p class="recording-status" data-recording-status>
+              <span data-recording-status-text>Recording controls will appear here when the frontend bundle is connected.</span>
+              <span class="recording-timer" data-recording-timer hidden></span>
+            </p>
 
             <div class="button-row">
               <button type="button" class="button button-primary" hidden data-start-recording-button>Start recording</button>
-              <button type="button" class="button button-secondary" hidden data-stop-recording-button>Stop recording</button>
+              <button type="button" class="button button-danger" hidden data-stop-recording-button>
+                <span class="recording-dot" aria-hidden="true"></span>
+                Stop recording
+              </button>
               <button type="button" class="button button-primary" hidden data-analyze-recording-button>Analyze recording</button>
               <button type="button" class="button button-secondary" hidden data-record-again-button>Record again</button>
             </div>

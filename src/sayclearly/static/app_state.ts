@@ -15,6 +15,29 @@ export type FlowState =
 type ConfigSource = 'env' | 'stored' | 'none';
 type ThinkingLevel = 'low' | 'medium' | 'high';
 
+export const LANGUAGES: readonly string[] = [
+  'English',
+  'Ukrainian',
+  'Russian',
+  'German',
+  'French',
+  'Spanish',
+  'Portuguese',
+  'Italian',
+  'Polish',
+  'Dutch',
+  'Czech',
+  'Turkish',
+  'Japanese',
+  'Chinese (Simplified)',
+  'Korean',
+  'Hindi',
+  'Arabic',
+  'Hebrew',
+  'Vietnamese',
+  'Indonesian',
+];
+
 const FALLBACK_GEMINI_MODELS: GeminiModelCatalogEntry[] = [
   {
     id: 'gemini-3-flash-preview',
@@ -186,10 +209,10 @@ export interface AppModel {
 
 const DEFAULT_CONFIG: PublicConfig = {
   version: 1,
-  text_language: 'uk',
-  analysis_language: 'uk',
+  text_language: 'English',
+  analysis_language: 'English',
   same_language_for_analysis: true,
-  ui_language: 'uk',
+  ui_language: 'English',
   last_topic_prompt: '',
   session_limit: 10,
   keep_last_audio: false,

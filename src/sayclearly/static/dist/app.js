@@ -89,14 +89,22 @@ function collectShellElements(root) {
         topicInput: getRequiredElement(root, '[data-topic-input]'),
         reuseTopicButton: getRequiredElement(root, '[data-reuse-topic-button]'),
         generateButton: getRequiredElement(root, '[data-generate-button]'),
+        generateSpinner: getRequiredElement(root, '[data-generate-spinner]'),
+        generateLabel: getRequiredElement(root, '[data-generate-label]'),
+        cancelGenerateButton: getRequiredElement(root, '[data-cancel-generate-button]'),
+        apiKeyPopover: getRequiredElement(root, '[data-api-key-popover]'),
+        apiKeyPopoverToggle: getRequiredElement(root, '[data-info-popover-toggle]'),
         resetButton: getRequiredElement(root, '[data-reset-button]'),
         nextStepButton: getRequiredElement(root, '[data-next-step-button]'),
         recordingControls: getRequiredElement(root, '[data-recording-controls]'),
         recordingStatus: getRequiredElement(root, '[data-recording-status]'),
+        recordingStatusText: getRequiredElement(root, '[data-recording-status-text]'),
+        recordingTimer: getRequiredElement(root, '[data-recording-timer]'),
         startRecordingButton: getRequiredElement(root, '[data-start-recording-button]'),
         stopRecordingButton: getRequiredElement(root, '[data-stop-recording-button]'),
         analyzeRecordingButton: getRequiredElement(root, '[data-analyze-recording-button]'),
         recordAgainButton: getRequiredElement(root, '[data-record-again-button]'),
+        step3Details: getRequiredElement(root, '[data-step3-details]'),
         recordingPreview: getRequiredElement(root, '[data-recording-preview]'),
         reviewPanel: getRequiredElement(root, '[data-review-panel]'),
         reviewSummary: getRequiredElement(root, '[data-review-summary]'),
@@ -316,8 +324,12 @@ function render(documentRef, elements, model, isSettingsOpen, reuseNextGeneratio
     elements.historyScreen.hidden = model.flow !== 'history';
     elements.setupScreen.hidden = hasExercise || model.flow === 'history';
     elements.exerciseScreen.hidden = !hasExercise || model.flow === 'history';
-    elements.generateButton.disabled = model.flow === 'generating_text';
-    elements.reuseTopicButton.disabled = model.flow === 'generating_text';
+    const isGenerating = model.flow === 'generating_text';
+    elements.generateButton.disabled = isGenerating;
+    elements.reuseTopicButton.disabled = isGenerating;
+    elements.generateSpinner.hidden = !isGenerating;
+    elements.generateLabel.textContent = isGenerating ? 'Generating...' : 'Generate';
+    elements.cancelGenerateButton.hidden = !isGenerating;
     elements.recordingControls.hidden = !showRecordingControls;
     elements.startRecordingButton.hidden = model.flow !== 'step_3_retell_ready';
     elements.stopRecordingButton.hidden = model.flow !== 'recording';
@@ -393,29 +405,48 @@ function render(documentRef, elements, model, isSettingsOpen, reuseNextGeneratio
     elements.historyDetailReuseTopicButton.disabled = !selected?.topic_prompt;
     elements.historyRetryButton.hidden = model.history_error === null;
     if (model.recording_error) {
-        elements.recordingStatus.textContent = model.recording_error;
+        elements.recordingStatusText.textContent = model.recording_error;
     }
     else {
         switch (model.flow) {
             case 'requesting_microphone':
-                elements.recordingStatus.textContent = 'Requesting microphone access...';
+                elements.recordingStatusText.textContent = 'Requesting microphone access...';
                 break;
             case 'recording':
-                elements.recordingStatus.textContent = 'Recording in progress. Stop when your retelling is complete.';
+                elements.recordingStatusText.textContent = 'Recording in progress. Stop when your retelling is complete.';
                 break;
             case 'recorded':
-                elements.recordingStatus.textContent = 'Recording ready. Listen back or upload it for feedback.';
+                elements.recordingStatusText.textContent = 'Recording ready. Listen back or upload it for feedback.';
                 break;
             case 'analyzing':
-                elements.recordingStatus.textContent = 'Uploading your recording for feedback...';
+                elements.recordingStatusText.textContent = 'Uploading your recording for feedback...';
                 break;
             case 'review':
-                elements.recordingStatus.textContent = 'Review ready. Record again when you want another attempt.';
+                elements.recordingStatusText.textContent = 'Review ready. Record again when you want another attempt.';
                 break;
             default:
-                elements.recordingStatus.textContent = 'Record your retelling when you are ready.';
+                elements.recordingStatusText.textContent = 'Record your retelling when you are ready.';
                 break;
         }
+    }
+    elements.recordingTimer.hidden = model.flow !== 'recording';
+    if (model.flow !== 'recording') {
+        elements.recordingTimer.textContent = '';
+    }
+    const isStep3Like = [
+        'step_3_retell_ready',
+        'requesting_microphone',
+        'recording',
+        'recorded',
+        'analyzing',
+        'review',
+    ].includes(model.flow);
+    if (hasExercise && !isStep3Like) {
+        elements.step3Details.classList.add('is-locked-open');
+        elements.step3Details.open = true;
+    }
+    else {
+        elements.step3Details.classList.remove('is-locked-open');
     }
     if (!hasExercise) {
         elements.stepLabel.textContent = STEP_CONTENT.step_1_slow.label;
@@ -451,6 +482,36 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     let activeRecorderToken = 0;
     let recordedBlob = null;
     let recordedUrl = null;
+    let activeAbortController = null;
+    let generationStartedAt = null;
+    let generationTickerId = null;
+    let recordingStartedAt = null;
+    let recordingTickerId = null;
+    const RECORDING_WARN_AFTER_SECONDS = 300;
+    const RECORDING_WARNING_SUFFIX = ' Long recordings may not analyze well.';
+    const formatDuration = (totalSeconds) => {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    };
+    const stopGenerationTicker = () => {
+        if (generationTickerId !== null) {
+            clearInterval(generationTickerId);
+            generationTickerId = null;
+        }
+        generationStartedAt = null;
+    };
+    const stopRecordingTicker = () => {
+        if (recordingTickerId !== null) {
+            clearInterval(recordingTickerId);
+            recordingTickerId = null;
+        }
+        recordingStartedAt = null;
+        elements.recordingTimer.textContent = '';
+    };
+    const closeStep3Details = () => {
+        elements.step3Details.open = false;
+    };
     const stopStream = (stream) => {
         for (const track of stream?.getTracks() ?? []) {
             track.stop();
@@ -464,6 +525,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
         activeRecorderToken += 1;
         activeRecorder = null;
         stopActiveStream();
+        stopRecordingTicker();
         recordedBlob = null;
         if (recordedUrl !== null) {
             recordingApi.revokeObjectURL(recordedUrl);
@@ -521,7 +583,38 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     });
     elements.nextStepButton.addEventListener('click', () => {
         model = advanceExerciseStep(model);
+        if (model.flow === 'step_3_retell_ready') {
+            closeStep3Details();
+        }
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
+    });
+    elements.cancelGenerateButton.addEventListener('click', () => {
+        activeAbortController?.abort();
+    });
+    elements.apiKeyPopoverToggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        const isOpen = elements.apiKeyPopover.classList.toggle('is-open');
+        elements.apiKeyPopoverToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+    documentRef.addEventListener('click', (event) => {
+        if (!elements.apiKeyPopover.classList.contains('is-open')) {
+            return;
+        }
+        const target = event.target;
+        if (target && elements.apiKeyPopover.contains(target)) {
+            return;
+        }
+        elements.apiKeyPopover.classList.remove('is-open');
+        elements.apiKeyPopoverToggle.setAttribute('aria-expanded', 'false');
+    });
+    documentRef.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+        if (elements.apiKeyPopover.classList.contains('is-open')) {
+            elements.apiKeyPopover.classList.remove('is-open');
+            elements.apiKeyPopoverToggle.setAttribute('aria-expanded', 'false');
+        }
     });
     elements.startRecordingButton.addEventListener('click', async () => {
         if (!recordingApi.isSupported()) {
@@ -574,6 +667,20 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             });
             recorder.start();
             model = markRecordingStarted(model);
+            recordingStartedAt = Date.now();
+            elements.recordingTimer.textContent = formatDuration(0);
+            const tickRecording = () => {
+                if (recordingStartedAt === null) {
+                    return;
+                }
+                const elapsed = Math.floor((Date.now() - recordingStartedAt) / 1000);
+                elements.recordingTimer.textContent = formatDuration(elapsed);
+                if (elapsed >= RECORDING_WARN_AFTER_SECONDS) {
+                    const baseText = 'Recording in progress. Stop when your retelling is complete.';
+                    elements.recordingStatusText.textContent = baseText + RECORDING_WARNING_SUFFIX;
+                }
+            };
+            recordingTickerId = setInterval(tickRecording, 1000);
         }
         catch {
             if (recorderToken !== activeRecorderToken) {
@@ -581,11 +688,14 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             }
             activeRecorder = null;
             stopActiveStream();
+            stopRecordingTicker();
             model = applyRecordingError(model, 'Microphone access was unavailable. Please try again.');
+            closeStep3Details();
         }
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.stopRecordingButton.addEventListener('click', () => {
+        stopRecordingTicker();
         activeRecorder?.stop();
     });
     elements.analyzeRecordingButton.addEventListener('click', async () => {
@@ -629,6 +739,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     elements.recordAgainButton.addEventListener('click', () => {
         clearRecordingArtifacts();
         model = resetRecording(model);
+        closeStep3Details();
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });
     elements.resetButton.addEventListener('click', () => {
@@ -730,6 +841,17 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             settings,
         };
         model = startGeneration(model);
+        const controller = new AbortController();
+        activeAbortController = controller;
+        generationStartedAt = Date.now();
+        const tickGeneration = () => {
+            if (generationStartedAt === null) {
+                return;
+            }
+            const elapsed = Math.floor((Date.now() - generationStartedAt) / 1000);
+            elements.statusMessage.textContent = `${GENERATING_STATUS} (${elapsed}s)`;
+        };
+        generationTickerId = setInterval(tickGeneration, 1000);
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
         try {
             let configForSave = model.config;
@@ -737,6 +859,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                 try {
                     configForSave = await requestJson(fetchImpl, '/api/config', {
                         method: 'GET',
+                        signal: controller.signal,
                     });
                     model = {
                         ...applyLoadedConfig(model, configForSave),
@@ -745,12 +868,16 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                     hasLoadedConfig = true;
                 }
                 catch (error) {
+                    if (controller.signal.aborted) {
+                        throw error;
+                    }
                     throw new RequestError('Request failed: /api/config', getRequestErrorMessage(error, LOAD_ERROR_STATUS));
                 }
             }
             const savedConfig = await requestJson(fetchImpl, '/api/config', {
                 method: 'POST',
                 body: JSON.stringify(buildConfigRequest(configForSave, settings, elements.apiKeyInput.value)),
+                signal: controller.signal,
             });
             hasLoadedConfig = true;
             model = {
@@ -761,13 +888,30 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             const exercise = await requestJson(fetchImpl, '/api/generate-text', {
                 method: 'POST',
                 body: JSON.stringify(buildGenerateRequest(settings)),
+                signal: controller.signal,
             });
             reuseNextGeneration = false;
             model = applyGeneratedExercise(model, exercise);
         }
         catch (error) {
-            reuseNextGeneration = false;
-            model = applyGenerationError(model, getRequestErrorMessage(error, GENERATE_ERROR_STATUS));
+            if (controller.signal.aborted) {
+                reuseNextGeneration = false;
+                model = {
+                    ...model,
+                    flow: 'home',
+                    error_message: null,
+                };
+            }
+            else {
+                reuseNextGeneration = false;
+                model = applyGenerationError(model, getRequestErrorMessage(error, GENERATE_ERROR_STATUS));
+            }
+        }
+        finally {
+            stopGenerationTicker();
+            if (activeAbortController === controller) {
+                activeAbortController = null;
+            }
         }
         render(documentRef, elements, model, isSettingsOpen, reuseNextGeneration, recordedUrl, fetchImpl, clearRecordingArtifacts);
     });

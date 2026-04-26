@@ -3,6 +3,8 @@
     font-family: Inter, "Segoe UI", sans-serif;
     background: #f3efe8;
     color: #1f2933;
+    --danger: #c8341c;
+    --danger-soft: rgba(200, 52, 28, 0.16);
 }
 
 * {
@@ -121,7 +123,6 @@ h2 {
 }
 
 .lead {
-    max-width: 42rem;
     margin: 1rem 0 0;
     line-height: 1.6;
     color: #52606d;
@@ -217,6 +218,173 @@ input[type="checkbox"] {
     background: transparent;
     color: #52606d;
     border: 1px solid rgba(82, 96, 109, 0.18);
+}
+
+.button-danger {
+    background: var(--danger);
+    color: #fffdf9;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.button[disabled] {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.button[data-generate-button] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.spinner {
+    display: inline-block;
+    width: 0.95rem;
+    height: 0.95rem;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 253, 249, 0.4);
+    border-top-color: #fffdf9;
+    animation: spinner-rotate 0.8s linear infinite;
+}
+
+@keyframes spinner-rotate {
+    to { transform: rotate(360deg); }
+}
+
+.recording-dot {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: #fffdf9;
+    animation: recording-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.78); }
+}
+
+.recording-timer {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--danger);
+}
+
+.label-with-popover {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.info-popover {
+    position: relative;
+    display: inline-block;
+}
+
+.info-popover-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(82, 96, 109, 0.12);
+    color: #52606d;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: help;
+    user-select: none;
+}
+
+.info-popover-trigger:hover,
+.info-popover-trigger:focus-visible {
+    background: rgba(82, 96, 109, 0.22);
+    color: #1f2933;
+    outline: none;
+}
+
+.info-popover-body {
+    display: none;
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 0.4rem);
+    left: 0;
+    width: min(22rem, 80vw);
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(138, 109, 59, 0.18);
+    border-radius: 0.85rem;
+    background: rgba(255, 253, 249, 0.98);
+    box-shadow: 0 0.6rem 1.6rem rgba(15, 23, 42, 0.12);
+    color: #52606d;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.info-popover-body > span {
+    display: block;
+}
+
+.info-popover-body > span + span {
+    margin-top: 0.5rem;
+}
+
+.info-popover:hover .info-popover-body,
+.info-popover:focus-within .info-popover-body,
+.info-popover.is-open .info-popover-body {
+    display: block;
+}
+
+.exercise-text-disclosure {
+    margin-bottom: 1rem;
+}
+
+.exercise-text-disclosure > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    margin-bottom: 0.6rem;
+    border-radius: 999px;
+    background: rgba(124, 92, 43, 0.1);
+    color: #523f21;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.exercise-text-disclosure > summary::-webkit-details-marker {
+    display: none;
+}
+
+.exercise-text-disclosure > summary::marker {
+    content: "";
+}
+
+.exercise-text-disclosure > summary::before {
+    content: "▸";
+    display: inline-block;
+    transition: transform 0.15s ease-out;
+}
+
+.exercise-text-disclosure[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.exercise-text-disclosure[data-step3-details].is-locked-open > summary {
+    display: none;
+}
+
+.exercise-text-disclosure .exercise-text {
+    margin-bottom: 0;
 }
 
 .recording-panel,
