@@ -533,7 +533,7 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
     reuse_last_topic: true,
   });
   assert.equal(shell.elements.get('[data-step-label]').textContent, 'Step 1 of 3');
-  assert.match(shell.elements.get('[data-step-title]').textContent, /warm-up/i);
+  assert.match(shell.elements.get('[data-step-title]').textContent, /slow/i);
   assert.equal(shell.elements.get('[data-exercise-text]').textContent, exercise.text);
 
   await shell.elements.get('[data-next-step-button]').click();

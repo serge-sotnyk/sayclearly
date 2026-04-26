@@ -47,23 +47,25 @@ const EXERCISE_PLACEHOLDER =
 const STEP_CONTENT = {
   step_1_slow: {
     label: 'Step 1 of 3',
-    title: 'Warm-up response',
+    title: 'Slow, exaggerated reading',
     instruction:
-      'Read the prompt out loud once, then repeat it with a slower and clearer pace.',
+      'Read the text very slowly and over-articulate every consonant and word ending.',
     nextButtonLabel: 'Next step',
     nextButtonDisabled: false,
   },
   step_2_natural: {
     label: 'Step 2 of 3',
-    title: 'Natural pace response',
-    instruction: 'Repeat the same text again, now at a calm and natural speaking pace.',
+    title: 'Closer to natural pace',
+    instruction:
+      'Read the same text again — closer to normal speech, but still a bit slower and clearer than usual.',
     nextButtonLabel: 'Next step',
     nextButtonDisabled: false,
   },
   step_3_retell_ready: {
     label: 'Step 3 of 3',
-    title: 'Retell from memory',
-    instruction: 'Put the text aside and retell the main idea in your own words.',
+    title: 'Retell and record',
+    instruction:
+      'Look away from the text and retell it in your own words, keeping the calm-and-clear style of step 2.',
     nextButtonLabel: 'All steps complete',
     nextButtonDisabled: true,
   },
