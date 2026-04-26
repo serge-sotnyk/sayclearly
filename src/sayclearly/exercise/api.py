@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
@@ -18,23 +17,7 @@ from sayclearly.exercise.service import (
     ExerciseServiceConfigurationError,
 )
 from sayclearly.storage.files import StorageError
-
-BAD_REQUEST_VALIDATION_TYPES = {
-    "extra_forbidden",
-    "json_invalid",
-    "missing",
-    "model_attributes_type",
-}
-
-
-def _is_bad_request_validation_error(error: dict[str, Any]) -> bool:
-    location = error.get("loc")
-    return (
-        isinstance(location, tuple)
-        and bool(location)
-        and location[0] == "body"
-        and error.get("type") in BAD_REQUEST_VALIDATION_TYPES
-    )
+from sayclearly.web.errors import is_bad_request_validation_error
 
 
 class ExerciseRoute(APIRoute):
@@ -47,7 +30,7 @@ class ExerciseRoute(APIRoute):
             except RequestValidationError as exc:
                 errors = exc.errors()
                 status_code = (
-                    400 if all(_is_bad_request_validation_error(error) for error in errors) else 422
+                    400 if all(is_bad_request_validation_error(error) for error in errors) else 422
                 )
                 return JSONResponse(
                     status_code=status_code,

@@ -1,6 +1,7 @@
-import os
+import logging
 from pathlib import Path
 
+from sayclearly.config.service import resolve_gemini_api_key
 from sayclearly.exercise.models import (
     ExerciseGenerationContext,
     ExerciseGenerationRequest,
@@ -15,7 +16,9 @@ from sayclearly.gemini.client import (
     MissingGeminiApiKeyError,
 )
 from sayclearly.gemini.telemetry import GeminiTelemetry
-from sayclearly.storage.files import load_config, load_history, load_secrets
+from sayclearly.storage.files import load_config, load_history
+
+logger = logging.getLogger(__name__)
 
 
 class ExerciseServiceError(RuntimeError):
@@ -81,6 +84,7 @@ class ExerciseService:
                 "Text generation is unavailable right now. Please try again."
             ) from exc
         except Exception as exc:
+            logger.exception("Unexpected error while generating exercise text")
             raise ExerciseGenerationProviderError(
                 "Text generation is unavailable right now. Please try again."
             ) from exc
@@ -101,23 +105,13 @@ class ExerciseService:
         return ""
 
     def _build_gemini_client(self) -> GeminiClient:
-        api_key = self._resolve_gemini_api_key()
+        api_key = resolve_gemini_api_key(self.data_root)
         if api_key is None:
             raise ExerciseServiceConfigurationError(
                 "Gemini API key is required before generating text."
             )
 
         return GeminiClient(api_key=api_key, telemetry=self.telemetry)
-
-    def _resolve_gemini_api_key(self) -> str | None:
-        env_api_key = os.getenv("GEMINI_API_KEY")
-        if env_api_key and env_api_key.strip():
-            return env_api_key.strip()
-
-        stored_api_key = load_secrets(self.data_root).gemini.api_key
-        if stored_api_key and stored_api_key.strip():
-            return stored_api_key.strip()
-        return None
 
     def _load_recent_texts(self, language: str) -> list[str]:
         history = load_history(self.data_root)

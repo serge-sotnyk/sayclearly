@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import Callable, Mapping
 from typing import Any
@@ -5,6 +6,8 @@ from typing import Any
 from langfuse import Langfuse
 
 from sayclearly.gemini.catalog import ThinkingLevel
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiGenerationTrace:
@@ -26,6 +29,7 @@ class GeminiGenerationTrace:
         try:
             self._observation.update(**kwargs)
         except Exception:
+            logger.debug("Langfuse observation update failed", exc_info=True)
             return
 
     def _end(self) -> None:
@@ -34,6 +38,7 @@ class GeminiGenerationTrace:
         try:
             self._observation.end()
         except Exception:
+            logger.debug("Langfuse observation end failed", exc_info=True)
             return
         self._flush()
 
@@ -46,6 +51,7 @@ class GeminiGenerationTrace:
         try:
             flush()
         except Exception:
+            logger.debug("Langfuse client flush failed", exc_info=True)
             return
 
 
@@ -112,6 +118,7 @@ class GeminiTelemetry:
                 model_parameters={"thinking_level": thinking_level},
             )
         except Exception:
+            logger.debug("Langfuse start_observation failed", exc_info=True)
             return GeminiGenerationTrace()
 
         return GeminiGenerationTrace(observation, langfuse_client)
@@ -134,6 +141,7 @@ class GeminiTelemetry:
                 base_url=host,
             )
         except Exception:
+            logger.debug("Langfuse client initialization failed", exc_info=True)
             self._langfuse_client = None
         return self._langfuse_client
 

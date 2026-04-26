@@ -18,7 +18,7 @@ BAD_REQUEST_VALIDATION_TYPES = {
 }
 
 
-def _is_bad_request_validation_error(error: dict[str, Any]) -> bool:
+def is_bad_request_validation_error(error: dict[str, Any]) -> bool:
     location = error.get("loc")
     return (
         isinstance(location, tuple)
@@ -38,7 +38,7 @@ def install_error_handlers(app: FastAPI) -> None:
         errors = exc.errors()
         status_code = 422
         if route_key in BAD_REQUEST_VALIDATION_ROUTES and all(
-            _is_bad_request_validation_error(error) for error in errors
+            is_bad_request_validation_error(error) for error in errors
         ):
             status_code = 400
         return JSONResponse(

@@ -1,9 +1,10 @@
-import os
+import logging
 from pathlib import Path
 from uuid import uuid4
 
 from pydantic import ValidationError
 
+from sayclearly.config.service import resolve_gemini_api_key
 from sayclearly.gemini.catalog import sanitize_analysis_model
 from sayclearly.gemini.client import (
     GeminiClient,
@@ -27,9 +28,10 @@ from sayclearly.storage.files import (
     StorageError,
     ensure_storage_root,
     load_config,
-    load_secrets,
 )
 from sayclearly.storage.models import Hesitation, SessionAnalysis
+
+logger = logging.getLogger(__name__)
 
 TEMP_RECORDINGS_DIR_NAME = "temporary-recordings"
 
@@ -114,6 +116,7 @@ class RecordingService:
         except GeminiMalformedResponseError as exc:
             raise RecordingAnalysisProviderError("Analysis did not complete. Try again.") from exc
         except Exception as exc:
+            logger.exception("Unexpected error while analyzing recording")
             raise RecordingAnalysisProviderError(
                 "Analysis is unavailable right now. Please try again."
             ) from exc
@@ -129,21 +132,12 @@ class RecordingService:
             return
 
     def _build_gemini_client(self) -> GeminiClient:
-        api_key = self._resolve_gemini_api_key()
+        api_key = resolve_gemini_api_key(self.data_root)
         if api_key is None:
             raise RecordingServiceConfigurationError(
                 "Gemini API key is required before analyzing recordings."
             )
         return GeminiClient(api_key=api_key, telemetry=self._telemetry)
-
-    def _resolve_gemini_api_key(self) -> str | None:
-        env_api_key = os.getenv("GEMINI_API_KEY")
-        if env_api_key and env_api_key.strip():
-            return env_api_key.strip()
-        stored_api_key = load_secrets(self.data_root).gemini.api_key
-        if stored_api_key and stored_api_key.strip():
-            return stored_api_key.strip()
-        return None
 
     def _normalize_analysis(self, structured: StructuredAudioAnalysis) -> RecordingAnalysisResult:
         analysis_hesitations = []

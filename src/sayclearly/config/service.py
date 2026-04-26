@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Literal
 
 from sayclearly.config.models import (
     ConfigSource,
@@ -20,6 +19,18 @@ from sayclearly.gemini.catalog import (
     sanitize_text_model,
 )
 from sayclearly.storage.files import load_config, load_secrets, save_config, save_secrets
+
+
+def resolve_gemini_api_key(data_root: Path | None = None) -> str | None:
+    """Return the active Gemini API key from env override or stored secrets."""
+    env_api_key = os.getenv("GEMINI_API_KEY")
+    if env_api_key and env_api_key.strip():
+        return env_api_key.strip()
+
+    stored_api_key = load_secrets(data_root).gemini.api_key
+    if stored_api_key and stored_api_key.strip():
+        return stored_api_key.strip()
+    return None
 
 
 class ConfigService:
@@ -145,19 +156,6 @@ class ConfigService:
         if is_supported_gemini_model(env_default):
             return env_default
         return PRODUCT_DEFAULT_ANALYSIS_MODEL
-
-    def _resolve_value(
-        self,
-        *,
-        env_name: str,
-        stored_value: str | None,
-    ) -> tuple[str | None, Literal["env", "stored", "none"]]:
-        env_value = self._get_env_override(env_name)
-        if env_value is not None:
-            return env_value, "env"
-        if stored_value is not None:
-            return stored_value, "stored"
-        return None, "none"
 
     def _resolve_langfuse_host(self, stored_value: str | None) -> str | None:
         host = self._get_env_override("LANGFUSE_HOST")
