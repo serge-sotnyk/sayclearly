@@ -207,7 +207,7 @@ def test_get_public_config_hides_secrets_and_reports_effective_sources(
     assert public.gemini.text_thinking_level == "medium"
     assert public.gemini.has_api_key is True
     assert public.gemini.api_key_source == "env"
-    assert public.gemini.available_models[0]["id"] == "gemini-3-flash-preview"
+    assert public.gemini.available_models[0].id == "gemini-3-flash-preview"
     assert public.langfuse.host == "https://env-langfuse.example"
     assert public.langfuse.has_public_key is True
     assert public.langfuse.public_key_source == "stored"
@@ -222,7 +222,7 @@ def test_get_public_config_hides_secrets_and_reports_effective_sources(
         "text_thinking_level": "medium",
         "has_api_key": True,
         "api_key_source": "env",
-        "available_models": public.gemini.available_models,
+        "available_models": [model.model_dump() for model in public.gemini.available_models],
     }
 
 

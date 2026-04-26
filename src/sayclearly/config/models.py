@@ -12,6 +12,7 @@ from pydantic import (
 
 from sayclearly.gemini.catalog import (
     PRODUCT_DEFAULT_TEXT_THINKING_LEVEL,
+    GeminiModelCatalogEntry,
     ThinkingLevel,
     is_supported_gemini_model,
 )
@@ -89,7 +90,7 @@ class GeminiPublicConfig(BaseModel):
     text_thinking_level: ThinkingLevel
     has_api_key: bool
     api_key_source: ConfigSource
-    available_models: list[dict[str, str | int | None]]
+    available_models: list[GeminiModelCatalogEntry]
 
     @computed_field
     @property
