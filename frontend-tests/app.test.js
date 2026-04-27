@@ -73,6 +73,11 @@ class FakeElement {
     this.listeners.set(type, listeners);
   }
 
+  setAttribute(name, value) {
+    this.attributes ??= new Map();
+    this.attributes.set(name, value);
+  }
+
   async dispatch(type) {
     const listeners = this.listeners.get(type) ?? [];
     for (const listener of listeners) {
@@ -232,7 +237,7 @@ function createHistoryStore(sessions = []) {
   };
 }
 
-function createShell() {
+function createShell({ recentTopics = null } = {}) {
   const reviewNewSessionButton = new FakeElement();
   const historyNewSessionButton = new FakeElement();
   const elements = new Map([
@@ -320,6 +325,9 @@ function createShell() {
     elements,
     new Map([['[data-new-session-button]', [reviewNewSessionButton, historyNewSessionButton]]]),
   );
+  const documentListeners = new Map();
+  const recentTopicsNode =
+    recentTopics === null ? null : { textContent: JSON.stringify(recentTopics) };
   const document = {
     createElement() {
       return new FakeElement();
@@ -328,14 +336,27 @@ function createShell() {
       if (selector === '[data-app-root]') {
         return root;
       }
+      if (selector === 'script[data-recent-topics-payload]') {
+        return recentTopicsNode;
+      }
 
       return null;
     },
-    addEventListener() {},
+    addEventListener(type, listener) {
+      const list = documentListeners.get(type) ?? [];
+      list.push(listener);
+      documentListeners.set(type, list);
+    },
     removeEventListener() {},
   };
 
-  return { document, root, elements };
+  const dispatchDocumentEvent = (type, event = {}) => {
+    for (const listener of documentListeners.get(type) ?? []) {
+      listener(event);
+    }
+  };
+
+  return { document, root, elements, documentListeners, dispatchDocumentEvent };
 }
 
 function createResponse(body, ok = true, status = 200) {
@@ -1162,4 +1183,167 @@ test('startApp renders local storage and optional telemetry copy from config', a
   assert.match(shell.elements.get('[data-local-storage-note]').textContent, /environment/i);
   assert.match(shell.elements.get('[data-telemetry-note]').textContent, /telemetry is active/i);
   assert.match(shell.elements.get('[data-telemetry-note]').textContent, /Langfuse/i);
+});
+
+test('history modal lists seeded recent topics and filters them by search input', async () => {
+  const shell = createShell({
+    recentTopics: [
+      { topic: 'Morning routines', text_language: 'uk', analysis_language: 'uk' },
+      { topic: 'Evening reflections', text_language: 'pl', analysis_language: 'en' },
+      { topic: 'Rust facts', text_language: 'en', analysis_language: 'en' },
+    ],
+  });
+  const { fetchStub } = createFetchStub(createResponse(createConfig()));
+
+  await startApp(shell.document, fetchStub);
+
+  const modal = shell.elements.get('[data-history-modal]');
+  assert.equal(modal.hidden, true);
+
+  // Clear the topic so the modal opens with an empty search box.
+  shell.elements.get('[data-topic-input]').value = '';
+  await shell.elements.get('[data-history-button]').click();
+
+  assert.equal(modal.hidden, false);
+  assert.equal(shell.elements.get('[data-history-modal-empty]').hidden, true);
+  assert.equal(shell.elements.get('[data-history-modal-all-section]').hidden, false);
+
+  const allList = shell.elements.get('[data-history-modal-all-list]');
+  assert.equal(allList.children.length, 3);
+  // li → button → [topic span, meta span]
+  assert.equal(allList.children[0].children[0].children[0].textContent, 'Morning routines');
+  assert.equal(allList.children[2].children[0].children[0].textContent, 'Rust facts');
+
+  // No search query yet → matches section stays hidden
+  assert.equal(shell.elements.get('[data-history-modal-matches-section]').hidden, true);
+  assert.equal(shell.elements.get('[data-history-modal-divider]').hidden, true);
+
+  const search = shell.elements.get('[data-history-modal-search]');
+  search.value = 'evening';
+  await search.input();
+
+  assert.equal(shell.elements.get('[data-history-modal-matches-section]').hidden, false);
+  assert.equal(shell.elements.get('[data-history-modal-divider]').hidden, false);
+  const matchesList = shell.elements.get('[data-history-modal-matches-list]');
+  assert.equal(matchesList.children.length, 1);
+  assert.equal(matchesList.children[0].children[0].children[0].textContent, 'Evening reflections');
+
+  search.value = 'no-such-topic';
+  await search.input();
+  assert.equal(matchesList.children.length, 1);
+  assert.equal(matchesList.children[0].className, 'history-modal-no-matches');
+});
+
+test('selecting a history modal entry restores topic and languages, closes modal', async () => {
+  const shell = createShell({
+    recentTopics: [
+      { topic: 'Evening reflections', text_language: 'pl', analysis_language: 'en' },
+      { topic: 'Morning routines', text_language: 'uk', analysis_language: 'uk' },
+    ],
+  });
+  // First entry seeds initial_topic → restoreLanguagesFromEntry runs at startup,
+  // bringing in pl/en before the user opens the modal.
+  const { fetchStub } = createFetchStub(createResponse(createConfig()));
+
+  await startApp(shell.document, fetchStub);
+
+  // Initial topic should already be seeded from the first recent entry.
+  assert.equal(shell.elements.get('[data-topic-input]').value, 'Evening reflections');
+  assert.equal(shell.elements.get('[data-text-language-input]').value, 'pl');
+  assert.equal(shell.elements.get('[data-analysis-language-input]').value, 'en');
+  assert.equal(shell.elements.get('[data-same-language-toggle]').checked, false);
+
+  await shell.elements.get('[data-history-button]').click();
+  // Search input is preseeded with current topic input value.
+  assert.equal(shell.elements.get('[data-history-modal-search]').value, 'Evening reflections');
+
+  const allList = shell.elements.get('[data-history-modal-all-list]');
+  // Click the second entry (Morning routines, uk/uk).
+  await allList.children[1].children[0].click();
+
+  // Modal closes.
+  assert.equal(shell.elements.get('[data-history-modal]').hidden, true);
+  // Topic and languages restored from the chosen entry.
+  assert.equal(shell.elements.get('[data-topic-input]').value, 'Morning routines');
+  assert.equal(shell.elements.get('[data-text-language-input]').value, 'uk');
+  assert.equal(shell.elements.get('[data-analysis-language-input]').value, 'uk');
+  assert.equal(shell.elements.get('[data-same-language-toggle]').checked, true);
+});
+
+test('history modal closes via backdrop click and ESC key', async () => {
+  const shell = createShell({
+    recentTopics: [
+      { topic: 'Morning routines', text_language: 'uk', analysis_language: 'uk' },
+    ],
+  });
+  const { fetchStub } = createFetchStub(createResponse(createConfig()));
+
+  await startApp(shell.document, fetchStub);
+
+  const modal = shell.elements.get('[data-history-modal]');
+
+  await shell.elements.get('[data-history-button]').click();
+  assert.equal(modal.hidden, false);
+  await shell.elements.get('[data-history-modal-backdrop]').click();
+  assert.equal(modal.hidden, true);
+
+  await shell.elements.get('[data-history-button]').click();
+  assert.equal(modal.hidden, false);
+  shell.dispatchDocumentEvent('keydown', { key: 'Escape' });
+  assert.equal(modal.hidden, true);
+});
+
+test('history modal shows empty state when there are no recent topics', async () => {
+  const shell = createShell({ recentTopics: [] });
+  const { fetchStub } = createFetchStub(createResponse(createConfig()));
+
+  await startApp(shell.document, fetchStub);
+
+  await shell.elements.get('[data-history-button]').click();
+
+  assert.equal(shell.elements.get('[data-history-modal]').hidden, false);
+  assert.equal(shell.elements.get('[data-history-modal-empty]').hidden, false);
+  assert.equal(shell.elements.get('[data-history-modal-all-section]').hidden, true);
+  assert.equal(shell.elements.get('[data-history-modal-matches-section]').hidden, true);
+});
+
+test('recording timer ticks while a recording is in progress', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 0 });
+
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const { fetchStub } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+  );
+  const recordingApi = createRecordingApi();
+
+  await startApp(shell.document, fetchStub, recordingApi);
+  await shell.elements.get('[data-generate-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-start-recording-button]').click();
+
+  const timer = shell.elements.get('[data-recording-timer]');
+  assert.equal(timer.textContent, '00:00');
+
+  t.mock.timers.tick(1000);
+  assert.equal(timer.textContent, '00:01');
+
+  t.mock.timers.tick(59000);
+  assert.equal(timer.textContent, '01:00');
+
+  // Cross the 5-minute warning threshold (300s).
+  t.mock.timers.tick(240_000);
+  assert.equal(timer.textContent, '05:00');
+  assert.match(
+    shell.elements.get('[data-recording-status-text]').textContent,
+    /long recordings may not analyze well/i,
+  );
+
+  // Stopping the recorder must clear the visible timer.
+  await shell.elements.get('[data-stop-recording-button]').click();
+  assert.equal(timer.textContent, '');
 });
