@@ -12,7 +12,6 @@ def make_payload() -> dict[str, object]:
         "analysis_language": "uk",
         "same_language_for_analysis": False,
         "ui_language": "en",
-        "last_topic_prompt": "interesting facts about astronomy",
         "session_limit": 250,
         "keep_last_audio": False,
         "gemini": {

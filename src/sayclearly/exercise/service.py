@@ -13,6 +13,7 @@ from sayclearly.gemini.client import (
     GeminiClient,
     GeminiInvalidCredentialsError,
     GeminiMalformedResponseError,
+    GeminiProviderError,
     MissingGeminiApiKeyError,
 )
 from sayclearly.gemini.telemetry import GeminiTelemetry
@@ -50,7 +51,7 @@ class ExerciseService:
         self.telemetry = telemetry or GeminiTelemetry()
 
     def generate_text(self, request: ExerciseGenerationRequest) -> ExerciseGenerationResponse:
-        topic_prompt = self._resolve_topic(request)
+        topic_prompt = request.topic_prompt.strip()
         generation_context = ExerciseGenerationContext(
             language=request.language,
             topic_prompt=topic_prompt,
@@ -80,14 +81,12 @@ class ExerciseService:
                 "Gemini API key was rejected. Update it and try again."
             ) from exc
         except GeminiMalformedResponseError as exc:
-            raise ExerciseGenerationProviderError(
-                "Text generation is unavailable right now. Please try again."
-            ) from exc
+            raise ExerciseGenerationProviderError("Gemini: returned a malformed response.") from exc
+        except GeminiProviderError as exc:
+            raise ExerciseGenerationProviderError(f"Gemini: {exc}") from exc
         except Exception as exc:
             logger.exception("Unexpected error while generating exercise text")
-            raise ExerciseGenerationProviderError(
-                "Text generation is unavailable right now. Please try again."
-            ) from exc
+            raise ExerciseGenerationProviderError(f"Gemini: {exc}") from exc
 
         return ExerciseGenerationResponse(
             language=request.language,
@@ -95,14 +94,6 @@ class ExerciseService:
             topic_prompt=topic_prompt,
             text=generated_exercise.text,
         )
-
-    def _resolve_topic(self, request: ExerciseGenerationRequest) -> str:
-        topic_prompt = request.topic_prompt.strip()
-        if topic_prompt:
-            return topic_prompt
-        if request.reuse_last_topic:
-            return load_config(self.data_root).last_topic_prompt
-        return ""
 
     def _build_gemini_client(self) -> GeminiClient:
         api_key = resolve_gemini_api_key(self.data_root)

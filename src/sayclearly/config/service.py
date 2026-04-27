@@ -65,7 +65,6 @@ class ConfigService:
             analysis_language=stored_config.analysis_language,
             same_language_for_analysis=stored_config.same_language_for_analysis,
             ui_language=stored_config.ui_language,
-            last_topic_prompt=stored_config.last_topic_prompt,
             session_limit=stored_config.session_limit,
             keep_last_audio=stored_config.keep_last_audio,
             gemini=GeminiPublicConfig(
@@ -96,7 +95,6 @@ class ConfigService:
         stored_config.analysis_language = payload.analysis_language
         stored_config.same_language_for_analysis = payload.same_language_for_analysis
         stored_config.ui_language = payload.ui_language
-        stored_config.last_topic_prompt = payload.last_topic_prompt
         stored_config.session_limit = payload.session_limit
         stored_config.keep_last_audio = payload.keep_last_audio
         stored_config.gemini.text_model = payload.gemini.text_model

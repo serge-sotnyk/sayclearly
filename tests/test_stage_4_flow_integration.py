@@ -35,7 +35,6 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
             "analysis_language": "uk",
             "same_language_for_analysis": False,
             "ui_language": config["ui_language"],
-            "last_topic_prompt": "Order coffee before work",
             "session_limit": config["session_limit"],
             "keep_last_audio": config["keep_last_audio"],
             "gemini": {
@@ -60,8 +59,7 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
         json={
             "language": "en",
             "analysis_language": "uk",
-            "topic_prompt": "",
-            "reuse_last_topic": True,
+            "topic_prompt": "Order coffee before work",
         },
     )
 

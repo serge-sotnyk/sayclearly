@@ -141,11 +141,19 @@
 
             <label class="field field-topic">
               <span>Topic</span>
-              <input type="text" name="topic" placeholder="Ordering coffee before work" data-topic-input />
+              <div class="topic-row">
+                <input
+                  type="text"
+                  name="topic"
+                  placeholder="Ordering coffee before work"
+                  data-topic-input
+                  value="{{ initial_topic if initial_topic else '' }}"
+                />
+                <button type="button" class="button button-secondary" data-history-button>History</button>
+              </div>
             </label>
 
             <div class="button-row">
-              <button type="button" class="button button-secondary" data-reuse-topic-button>Reuse topic</button>
               <button type="button" class="button button-primary" data-generate-button>
                 <span class="spinner" aria-hidden="true" data-generate-spinner hidden></span>
                 <span data-generate-label>Generate</span>
@@ -182,6 +190,7 @@
                 Stop recording
               </button>
               <button type="button" class="button button-primary" hidden data-analyze-recording-button>Analyze recording</button>
+              <button type="button" class="button button-ghost" hidden data-cancel-analyze-button>Cancel</button>
               <button type="button" class="button button-secondary" hidden data-record-again-button>Record again</button>
             </div>
 
@@ -284,7 +293,37 @@
           </div>
         </aside>
       </div>
+      <div
+        class="history-modal"
+        data-history-modal
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-modal-title"
+      >
+        <div class="history-modal-backdrop" data-history-modal-backdrop></div>
+        <div class="history-modal-dialog">
+          <div class="history-modal-heading">
+            <h2 id="history-modal-title">Recent topics</h2>
+            <button type="button" class="button button-ghost" data-history-modal-close aria-label="Close">×</button>
+          </div>
+          <input type="search" placeholder="Filter topics..." data-history-modal-search class="history-modal-search" />
+          <div class="history-modal-body" data-history-modal-body>
+            <p class="history-modal-empty" data-history-modal-empty hidden>No saved topics yet.</p>
+            <section class="history-modal-section" data-history-modal-matches-section hidden>
+              <p class="history-modal-section-label">Matches</p>
+              <ul class="history-modal-list" data-history-modal-matches-list></ul>
+            </section>
+            <hr class="history-modal-divider" data-history-modal-divider hidden />
+            <section class="history-modal-section" data-history-modal-all-section>
+              <p class="history-modal-section-label">All topics</p>
+              <ul class="history-modal-list" data-history-modal-all-list></ul>
+            </section>
+          </div>
+        </div>
+      </div>
     </main>
+    <script type="application/json" data-recent-topics-payload>{{ recent_topics | tojson }}</script>
     <script type="module" src="{{ url_for('static', path='/dist/app.js') }}"></script>
   </body>
 </html>

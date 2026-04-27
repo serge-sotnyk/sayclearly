@@ -15,7 +15,6 @@ def make_payload(**overrides: object) -> ConfigUpdatePayload:
         "analysis_language": "uk",
         "same_language_for_analysis": False,
         "ui_language": "en",
-        "last_topic_prompt": "interesting facts about astronomy",
         "session_limit": 123,
         "keep_last_audio": True,
         "gemini": {

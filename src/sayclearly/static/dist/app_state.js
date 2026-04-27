@@ -48,7 +48,6 @@ const DEFAULT_CONFIG = {
     analysis_language: 'English',
     same_language_for_analysis: true,
     ui_language: 'English',
-    last_topic_prompt: '',
     session_limit: 10,
     keep_last_audio: false,
     gemini: {
@@ -79,8 +78,7 @@ function buildSettingsFromConfig(config) {
         analysis_model: config.gemini.analysis_model,
         same_model_for_analysis: config.gemini.same_model_for_analysis,
         text_thinking_level: config.gemini.text_thinking_level,
-        topic_prompt: config.last_topic_prompt,
-        reuse_last_topic: false,
+        topic_prompt: '',
     });
 }
 export function createInitialAppModel() {
@@ -135,20 +133,15 @@ export function buildGenerateRequest(settings) {
         language: syncedSettings.text_language,
         analysis_language: syncedSettings.analysis_language,
         topic_prompt: syncedSettings.topic_prompt,
-        reuse_last_topic: syncedSettings.reuse_last_topic,
     };
 }
 export function buildConfigUpdatePayload(config, settings) {
     const syncedSettings = syncSettings(settings);
-    const lastTopicPrompt = syncedSettings.reuse_last_topic && syncedSettings.topic_prompt === ''
-        ? config.last_topic_prompt
-        : syncedSettings.topic_prompt;
     return {
         text_language: syncedSettings.text_language,
         analysis_language: syncedSettings.analysis_language,
         same_language_for_analysis: syncedSettings.same_language_for_analysis,
         ui_language: config.ui_language,
-        last_topic_prompt: lastTopicPrompt,
         session_limit: config.session_limit,
         keep_last_audio: config.keep_last_audio,
         gemini: {
@@ -333,9 +326,48 @@ export function reuseTopic(model, topicPrompt) {
         settings: {
             ...model.settings,
             topic_prompt: topicPrompt,
-            reuse_last_topic: false,
         },
     };
+}
+export function dedupeRecentTopics(entries) {
+    const seen = new Set();
+    const result = [];
+    for (const entry of entries) {
+        const topic = entry.topic.trim();
+        if (!topic) {
+            continue;
+        }
+        const key = topic.toLocaleLowerCase();
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push({ ...entry, topic });
+    }
+    return result;
+}
+export function pushRecentTopic(entries, next, limit) {
+    const merged = dedupeRecentTopics([next, ...entries]);
+    return limit !== undefined && limit > 0 ? merged.slice(0, limit) : merged;
+}
+export function findRecentTopicMatch(entries, topicValue) {
+    const normalized = topicValue.trim().toLocaleLowerCase();
+    if (!normalized) {
+        return null;
+    }
+    for (const entry of entries) {
+        if (entry.topic.trim().toLocaleLowerCase() === normalized) {
+            return entry;
+        }
+    }
+    return null;
+}
+export function filterRecentTopics(entries, query) {
+    const normalized = query.trim().toLocaleLowerCase();
+    if (!normalized) {
+        return [];
+    }
+    return entries.filter((entry) => entry.topic.toLocaleLowerCase().includes(normalized));
 }
 export function resetRecording(model) {
     return {

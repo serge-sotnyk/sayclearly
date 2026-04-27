@@ -164,7 +164,6 @@ function createConfig(overrides = {}) {
     analysis_language: 'uk',
     same_language_for_analysis: true,
     ui_language: 'uk',
-    last_topic_prompt: 'Morning routines',
     session_limit: 10,
     keep_last_audio: false,
     gemini: {
@@ -253,7 +252,17 @@ function createShell() {
     ['[data-analysis-language-input]', new FakeElement()],
     ['[data-same-language-toggle]', new FakeElement({ checked: true })],
     ['[data-topic-input]', new FakeElement()],
-    ['[data-reuse-topic-button]', new FakeElement()],
+    ['[data-history-button]', new FakeElement()],
+    ['[data-history-modal]', new FakeElement({ hidden: true })],
+    ['[data-history-modal-backdrop]', new FakeElement()],
+    ['[data-history-modal-close]', new FakeElement()],
+    ['[data-history-modal-search]', new FakeElement()],
+    ['[data-history-modal-empty]', new FakeElement({ hidden: true })],
+    ['[data-history-modal-matches-section]', new FakeElement({ hidden: true })],
+    ['[data-history-modal-matches-list]', new FakeElement()],
+    ['[data-history-modal-divider]', new FakeElement({ hidden: true })],
+    ['[data-history-modal-all-section]', new FakeElement()],
+    ['[data-history-modal-all-list]', new FakeElement()],
     ['[data-generate-button]', new FakeElement()],
     ['[data-generate-spinner]', new FakeElement({ hidden: true })],
     ['[data-generate-label]', new FakeElement({ textContent: 'Generate' })],
@@ -274,6 +283,7 @@ function createShell() {
     ['[data-start-recording-button]', new FakeElement()],
     ['[data-stop-recording-button]', new FakeElement({ hidden: true })],
     ['[data-analyze-recording-button]', new FakeElement({ hidden: true })],
+    ['[data-cancel-analyze-button]', new FakeElement({ hidden: true })],
     ['[data-record-again-button]', new FakeElement({ hidden: true })],
     ['[data-recording-preview]', new FakeElement({ hidden: true })],
     ['[data-review-panel]', new FakeElement({ hidden: true })],
@@ -411,7 +421,7 @@ test('startApp loads config, renders the shell, and keeps languages synced while
   );
   assert.equal(shell.elements.get('[data-same-model-toggle]').checked, false);
   assert.equal(shell.elements.get('[data-thinking-level-select]').value, 'medium');
-  assert.equal(shell.elements.get('[data-topic-input]').value, 'Morning routines');
+  assert.equal(shell.elements.get('[data-topic-input]').value, '');
   assert.match(shell.elements.get('[data-settings-status]').textContent, /stored/i);
   assert.equal(shell.elements.get('[data-settings-panel]').hidden, true);
   assert.deepEqual(
@@ -495,7 +505,7 @@ test('startApp disables the analysis model selector and saves a coherent gemini 
   });
 });
 
-test('startApp saves config, generates text, advances steps, supports reuse, and resets home', async () => {
+test('startApp saves config, generates text, advances steps, and resets home', async () => {
   const shell = createShell();
   const config = createConfig();
   const exercise = createExercise();
@@ -507,8 +517,8 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
 
   await startApp(shell.document, fetchStub);
 
-  shell.elements.get('[data-topic-input]').value = '';
-  await shell.elements.get('[data-reuse-topic-button]').click();
+  shell.elements.get('[data-topic-input]').value = 'Morning routines';
+  await shell.elements.get('[data-topic-input]').input();
   await shell.elements.get('[data-generate-button]').click();
 
   assert.deepEqual(
@@ -520,7 +530,6 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
     analysis_language: 'uk',
     same_language_for_analysis: true,
     ui_language: 'uk',
-    last_topic_prompt: 'Morning routines',
     session_limit: 10,
     keep_last_audio: false,
     gemini: {
@@ -539,8 +548,7 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
   assert.deepEqual(JSON.parse(calls[2].options.body), {
     language: 'uk',
     analysis_language: 'uk',
-    topic_prompt: '',
-    reuse_last_topic: true,
+    topic_prompt: 'Morning routines',
   });
   assert.equal(shell.elements.get('[data-step-label]').textContent, 'Step 1 of 3');
   assert.match(shell.elements.get('[data-step-title]').textContent, /slow/i);
@@ -557,34 +565,30 @@ test('startApp saves config, generates text, advances steps, supports reuse, and
   assert.match(shell.elements.get('[data-exercise-text]').textContent, /appear here/i);
 });
 
-test('startApp clears reuse intent when the user types a fresh topic before generating', async () => {
+test('typing whitespace in the topic input is not eaten by the render writeback', async () => {
   const shell = createShell();
   const config = createConfig();
-  const exercise = createExercise({ topic_prompt: 'Fresh topic' });
-  const { fetchStub, calls } = createFetchStub(
-    createResponse(config),
-    createResponse(config),
-    createResponse(exercise),
-  );
+  const { fetchStub } = createFetchStub(createResponse(config));
 
   await startApp(shell.document, fetchStub);
 
-  shell.elements.get('[data-topic-input]').value = '';
-  await shell.elements.get('[data-reuse-topic-button]').click();
-  assert.match(shell.elements.get('[data-status-message]').textContent, /reuse/i);
+  const topicInput = shell.elements.get('[data-topic-input]');
 
-  shell.elements.get('[data-topic-input]').value = 'Fresh topic';
-  await shell.elements.get('[data-topic-input]').input();
-  assert.equal(shell.elements.get('[data-status-message]').textContent, 'Ready to generate a guided exercise.');
+  topicInput.value = 'about ';
+  await topicInput.input();
+  assert.equal(
+    topicInput.value,
+    'about ',
+    'trailing space must survive the input → readSettings → render roundtrip',
+  );
 
-  await shell.elements.get('[data-generate-button]').click();
+  topicInput.value = 'about a';
+  await topicInput.input();
+  assert.equal(topicInput.value, 'about a');
 
-  assert.deepEqual(JSON.parse(calls[2].options.body), {
-    language: 'uk',
-    analysis_language: 'uk',
-    topic_prompt: 'Fresh topic',
-    reuse_last_topic: false,
-  });
+  topicInput.value = '   leading';
+  await topicInput.input();
+  assert.equal(topicInput.value, '   leading');
 });
 
 test('startApp clears stored API keys and refreshes the rendered status', async () => {
@@ -714,6 +718,27 @@ test('startApp shows backend generation detail when the API returns a calm 400 m
   );
 });
 
+test('startApp wraps provider 502 generation detail with the friendly fallback', async () => {
+  const shell = createShell();
+  const { fetchStub } = createFetchStub(
+    createResponse(createConfig()),
+    createResponse(createConfig()),
+    createResponse(
+      { detail: 'Gemini: This model is currently experiencing high demand.' },
+      false,
+      502,
+    ),
+  );
+
+  await startApp(shell.document, fetchStub);
+  await shell.elements.get('[data-generate-button]').click();
+
+  assert.equal(
+    shell.elements.get('[data-status-message]').textContent,
+    'Could not generate a guided exercise. Check your settings and try again. (Gemini: This model is currently experiencing high demand.)',
+  );
+});
+
 test('startApp shows backend config detail during startup and retry failures', async () => {
   const startupShell = createShell();
   const retryShell = createShell();
@@ -801,7 +826,6 @@ test('startApp reloads persisted config before saving after the initial config l
     analysis_language: 'English',
     same_language_for_analysis: true,
     ui_language: 'en',
-    last_topic_prompt: 'Fresh topic',
     session_limit: 77,
     keep_last_audio: true,
     gemini: {
@@ -823,7 +847,6 @@ test('startApp reloads persisted config before saving after the initial config l
 test('startApp preserves entered settings when generate fails after reload-and-save recovery', async () => {
   const shell = createShell();
   const storedConfig = createConfig({
-    last_topic_prompt: 'Stored topic',
     gemini: {
       ...createConfig().gemini,
       text_model: 'gemini-3-flash-preview',
@@ -833,7 +856,6 @@ test('startApp preserves entered settings when generate fails after reload-and-s
     },
   });
   const savedConfig = createConfig({
-    last_topic_prompt: 'Fresh topic',
     gemini: {
       ...storedConfig.gemini,
       text_model: 'gemini-2.5-flash',
@@ -1020,7 +1042,99 @@ test('startApp preserves the recorded retelling when upload fails', async () => 
 
   assert.equal(shell.elements.get('[data-recording-preview]').hidden, false);
   assert.equal(shell.elements.get('[data-analyze-recording-button]').hidden, false);
-  assert.match(shell.elements.get('[data-recording-status-text]').textContent, /could not upload/i);
+  assert.match(shell.elements.get('[data-recording-status-text]').textContent, /could not analyze/i);
+});
+
+test('startApp wraps provider 502 analyze detail with the friendly fallback', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+  const { fetchStub } = createFetchStub(
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+    createResponse(
+      { detail: 'Gemini: Service is currently overloaded.' },
+      false,
+      502,
+    ),
+  );
+
+  await startApp(shell.document, fetchStub, createRecordingApi());
+  await shell.elements.get('[data-generate-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-start-recording-button]').click();
+  await shell.elements.get('[data-stop-recording-button]').click();
+
+  await shell.elements.get('[data-analyze-recording-button]').click();
+
+  assert.equal(
+    shell.elements.get('[data-recording-status-text]').textContent,
+    'Could not analyze the recording. Try again. (Gemini: Service is currently overloaded.)',
+  );
+});
+
+test('startApp Cancel during analyze returns to recorded state without an error', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const exercise = createExercise();
+
+  // The fourth fetch is the analyze request. We hold it forever so the user
+  // has time to click Cancel; the AbortController must surface the abort.
+  let analyzeRejector;
+  const analyzePromise = new Promise((_, reject) => {
+    analyzeRejector = reject;
+  });
+
+  const responses = [
+    createResponse(config),
+    createResponse(config),
+    createResponse(exercise),
+    analyzePromise,
+  ];
+  const calls = [];
+  const fetchStub = async (url, options = {}) => {
+    calls.push({ url, options });
+    const next = responses.shift();
+    if (next instanceof Promise) {
+      // Cancel via AbortSignal
+      if (options.signal) {
+        options.signal.addEventListener('abort', () => {
+          const abortError = new Error('aborted');
+          abortError.name = 'AbortError';
+          analyzeRejector(abortError);
+        });
+      }
+      return next;
+    }
+    return next;
+  };
+
+  await startApp(shell.document, fetchStub, createRecordingApi());
+  await shell.elements.get('[data-generate-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-next-step-button]').click();
+  await shell.elements.get('[data-start-recording-button]').click();
+  await shell.elements.get('[data-stop-recording-button]').click();
+
+  const analyzeClick = shell.elements.get('[data-analyze-recording-button]').click();
+
+  // While analyze is in-flight, the cancel button must be visible.
+  await Promise.resolve();
+  assert.equal(shell.elements.get('[data-cancel-analyze-button]').hidden, false);
+
+  await shell.elements.get('[data-cancel-analyze-button]').click();
+  await analyzeClick;
+
+  // After cancel: back to recorded state, analyze button visible again, no error.
+  assert.equal(shell.elements.get('[data-cancel-analyze-button]').hidden, true);
+  assert.equal(shell.elements.get('[data-analyze-recording-button]').hidden, false);
+  assert.doesNotMatch(
+    shell.elements.get('[data-recording-status-text]').textContent,
+    /could not analyze/i,
+  );
+  assert.equal(calls[3].url, '/api/analyze-recording');
 });
 
 test('startApp renders local storage and optional telemetry copy from config', async () => {

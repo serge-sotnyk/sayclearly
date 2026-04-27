@@ -10,6 +10,7 @@ from sayclearly.gemini.client import (
     GeminiClient,
     GeminiInvalidCredentialsError,
     GeminiMalformedResponseError,
+    GeminiProviderError,
     MissingGeminiApiKeyError,
 )
 from sayclearly.gemini.telemetry import GeminiTelemetry
@@ -114,12 +115,12 @@ class RecordingService:
                 "Gemini API key was rejected. Update it and try again."
             ) from exc
         except GeminiMalformedResponseError as exc:
-            raise RecordingAnalysisProviderError("Analysis did not complete. Try again.") from exc
+            raise RecordingAnalysisProviderError("Gemini: returned a malformed response.") from exc
+        except GeminiProviderError as exc:
+            raise RecordingAnalysisProviderError(f"Gemini: {exc}") from exc
         except Exception as exc:
             logger.exception("Unexpected error while analyzing recording")
-            raise RecordingAnalysisProviderError(
-                "Analysis is unavailable right now. Please try again."
-            ) from exc
+            raise RecordingAnalysisProviderError(f"Gemini: {exc}") from exc
         finally:
             self._delete_temp_file(path)
 

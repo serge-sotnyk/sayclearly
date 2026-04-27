@@ -4,6 +4,7 @@ from sayclearly.gemini.client import (
     GeminiClient,
     GeminiInvalidCredentialsError,
     GeminiMalformedResponseError,
+    GeminiProviderError,
     GeneratedExercise,
 )
 from sayclearly.gemini.telemetry import GeminiTelemetry
@@ -210,6 +211,50 @@ def test_analyze_audio_rejects_malformed_response() -> None:
     client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
 
     with pytest.raises(GeminiMalformedResponseError):
+        client.analyze_audio(
+            audio_bytes=b"fake audio",
+            content_type="audio/webm",
+            prompt="Analyze this recording.",
+            model="gemini-2.5-flash",
+            thinking_level="low",
+        )
+
+
+def test_generate_exercise_surfaces_provider_message_from_api_error() -> None:
+    class FakeApiError(Exception):
+        def __init__(self) -> None:
+            self.code = 503
+            self.message = "This model is currently experiencing high demand."
+            super().__init__(self.message)
+
+    sdk_client = FakeSdkClient(FakeApiError())
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
+
+    with pytest.raises(
+        GeminiProviderError,
+        match=r"^This model is currently experiencing high demand\.$",
+    ):
+        client.generate_exercise(
+            prompt="Generate a reading exercise.",
+            model="gemini-2.5-flash",
+            thinking_level="low",
+        )
+
+
+def test_analyze_audio_surfaces_provider_message_from_api_error() -> None:
+    class FakeApiError(Exception):
+        def __init__(self) -> None:
+            self.code = 503
+            self.message = "Service is overloaded. Try again later."
+            super().__init__(self.message)
+
+    sdk_client = FakeSdkClient(FakeApiError())
+    client = GeminiClient(api_key="test-key", sdk_client=sdk_client)
+
+    with pytest.raises(
+        GeminiProviderError,
+        match=r"^Service is overloaded\. Try again later\.$",
+    ):
         client.analyze_audio(
             audio_bytes=b"fake audio",
             content_type="audio/webm",

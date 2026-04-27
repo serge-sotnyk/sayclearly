@@ -127,3 +127,84 @@ def test_get_session_raises_for_missing_id(tmp_path: Path) -> None:
 
     with pytest.raises(HistorySessionNotFoundError, match="missing"):
         service.get_session("missing")
+
+
+def _topic_session(
+    session_id: str,
+    *,
+    topic: str | None,
+    language: str = "Ukrainian",
+    analysis_language: str | None = "Ukrainian",
+    second: int = 0,
+) -> HistorySession:
+    return HistorySession(
+        id=session_id,
+        created_at=f"2026-04-20T10:00:{second:02d}",
+        language=language,
+        analysis_language=analysis_language,
+        topic_prompt=topic,
+        text=f"Text for {session_id}",
+        analysis=SessionAnalysis(clarity_score=80, pace_score=70, summary=["ok"]),
+    )
+
+
+def test_recent_topic_entries_returns_unique_topics_newest_first(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    service.save_session(_topic_session("01", topic="rust facts", second=1))
+    service.save_session(
+        _topic_session("02", topic="ordering coffee", language="English", second=2)
+    )
+    service.save_session(_topic_session("03", topic="RUST FACTS", second=3))
+
+    entries = service.recent_topic_entries()
+
+    assert [entry.topic for entry in entries] == ["RUST FACTS", "ordering coffee"]
+    assert entries[0].text_language == "Ukrainian"
+    assert entries[1].text_language == "English"
+
+
+def test_recent_topic_entries_excludes_empty_topics(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    service.save_session(_topic_session("01", topic="real topic", second=1))
+    service.save_session(_topic_session("02", topic=None, second=2))
+    service.save_session(_topic_session("03", topic="   ", second=3))
+
+    entries = service.recent_topic_entries()
+
+    assert [entry.topic for entry in entries] == ["real topic"]
+
+
+def test_recent_topic_entries_falls_back_for_legacy_analysis_language(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    service.save_session(
+        _topic_session(
+            "01",
+            topic="legacy topic",
+            language="Ukrainian",
+            analysis_language=None,
+            second=1,
+        )
+    )
+
+    entries = service.recent_topic_entries()
+
+    assert entries[0].analysis_language == "Ukrainian"
+
+
+def test_recent_topic_entries_caps_at_limit(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    for index in range(5):
+        service.save_session(_topic_session(f"{index:02}", topic=f"topic {index}", second=index))
+
+    entries = service.recent_topic_entries(limit=3)
+
+    assert len(entries) == 3
+    assert entries[0].topic == "topic 4"
+
+
+def test_recent_topic_entries_returns_empty_for_zero_or_negative_limit(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    service.save_session(_topic_session("01", topic="any", second=1))
+
+    assert service.recent_topic_entries(limit=0) == []
+    assert service.recent_topic_entries(limit=-1) == []

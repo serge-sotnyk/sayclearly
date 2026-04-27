@@ -103,7 +103,9 @@ class GeminiClient:
                 raise GeminiInvalidCredentialsError(
                     "Gemini API key was rejected. Update it and try again."
                 ) from exc
-            raise GeminiProviderError("Gemini text generation request failed.") from exc
+            raise GeminiProviderError(
+                _extract_provider_message(exc) or "Gemini text generation request failed."
+            ) from exc
 
         try:
             if isinstance(response.text, str) and response.text.strip() != "":
@@ -157,7 +159,9 @@ class GeminiClient:
                 raise GeminiInvalidCredentialsError(
                     "Gemini API key was rejected. Update it and try again."
                 ) from exc
-            raise GeminiProviderError("Gemini audio analysis request failed.") from exc
+            raise GeminiProviderError(
+                _extract_provider_message(exc) or "Gemini audio analysis request failed."
+            ) from exc
 
         try:
             if isinstance(response.text, str) and response.text.strip() != "":
@@ -181,6 +185,21 @@ class GeminiClient:
             return types.ThinkingConfig(thinking_level=_THINKING_LEVELS[thinking_level])
 
         return types.ThinkingConfig(thinking_budget=_THINKING_BUDGETS[thinking_level])
+
+
+def _extract_provider_message(exc: Exception) -> str | None:
+    """Best-effort plain-text message from a provider exception.
+
+    The Google GenAI SDK raises subclasses of ``APIError`` whose ``message``
+    attribute carries the provider-supplied text (e.g. quota / availability
+    notes). When unavailable, fall back to ``str(exc)`` so we still surface
+    something meaningful.
+    """
+    candidate = getattr(exc, "message", None)
+    if isinstance(candidate, str) and candidate.strip():
+        return candidate.strip()
+    text = str(exc).strip()
+    return text or None
 
 
 def _is_invalid_credentials_error(exc: Exception) -> bool:

@@ -93,7 +93,6 @@ export interface PublicConfig {
   analysis_language: string;
   same_language_for_analysis: boolean;
   ui_language: string;
-  last_topic_prompt: string;
   session_limit: number;
   keep_last_audio: boolean;
   gemini: GeminiPublicConfig;
@@ -109,7 +108,17 @@ export interface SettingsFormState {
   same_model_for_analysis: boolean;
   text_thinking_level: ThinkingLevel;
   topic_prompt: string;
-  reuse_last_topic: boolean;
+}
+
+export interface RecentTopicEntry {
+  topic: string;
+  text_language: string;
+  analysis_language: string;
+}
+
+export interface InitialPageData {
+  recent_topics: RecentTopicEntry[];
+  initial_topic: string | null;
 }
 
 export interface GeneratedExercise {
@@ -144,6 +153,7 @@ export interface HistorySession {
   id: string;
   created_at: string;
   language: string;
+  analysis_language: string | null;
   topic_prompt: string | null;
   text: string;
   analysis: SessionAnalysis;
@@ -165,7 +175,6 @@ interface GenerateRequest {
   language: string;
   analysis_language: string;
   topic_prompt: string;
-  reuse_last_topic: boolean;
 }
 
 interface ConfigUpdatePayload {
@@ -173,7 +182,6 @@ interface ConfigUpdatePayload {
   analysis_language: string;
   same_language_for_analysis: boolean;
   ui_language: string;
-  last_topic_prompt: string;
   session_limit: number;
   keep_last_audio: boolean;
   gemini: {
@@ -213,7 +221,6 @@ const DEFAULT_CONFIG: PublicConfig = {
   analysis_language: 'English',
   same_language_for_analysis: true,
   ui_language: 'English',
-  last_topic_prompt: '',
   session_limit: 10,
   keep_last_audio: false,
   gemini: {
@@ -245,8 +252,7 @@ function buildSettingsFromConfig(config: PublicConfig): SettingsFormState {
     analysis_model: config.gemini.analysis_model,
     same_model_for_analysis: config.gemini.same_model_for_analysis,
     text_thinking_level: config.gemini.text_thinking_level,
-    topic_prompt: config.last_topic_prompt,
-    reuse_last_topic: false,
+    topic_prompt: '',
   });
 }
 
@@ -310,7 +316,6 @@ export function buildGenerateRequest(settings: SettingsFormState): GenerateReque
     language: syncedSettings.text_language,
     analysis_language: syncedSettings.analysis_language,
     topic_prompt: syncedSettings.topic_prompt,
-    reuse_last_topic: syncedSettings.reuse_last_topic,
   };
 }
 
@@ -319,17 +324,12 @@ export function buildConfigUpdatePayload(
   settings: SettingsFormState,
 ): ConfigUpdatePayload {
   const syncedSettings = syncSettings(settings);
-  const lastTopicPrompt =
-    syncedSettings.reuse_last_topic && syncedSettings.topic_prompt === ''
-      ? config.last_topic_prompt
-      : syncedSettings.topic_prompt;
 
   return {
     text_language: syncedSettings.text_language,
     analysis_language: syncedSettings.analysis_language,
     same_language_for_analysis: syncedSettings.same_language_for_analysis,
     ui_language: config.ui_language,
-    last_topic_prompt: lastTopicPrompt,
     session_limit: config.session_limit,
     keep_last_audio: config.keep_last_audio,
     gemini: {
@@ -537,9 +537,66 @@ export function reuseTopic(model: AppModel, topicPrompt: string): AppModel {
     settings: {
       ...model.settings,
       topic_prompt: topicPrompt,
-      reuse_last_topic: false,
     },
   };
+}
+
+export function dedupeRecentTopics(entries: RecentTopicEntry[]): RecentTopicEntry[] {
+  const seen = new Set<string>();
+  const result: RecentTopicEntry[] = [];
+
+  for (const entry of entries) {
+    const topic = entry.topic.trim();
+    if (!topic) {
+      continue;
+    }
+    const key = topic.toLocaleLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push({ ...entry, topic });
+  }
+
+  return result;
+}
+
+export function pushRecentTopic(
+  entries: RecentTopicEntry[],
+  next: RecentTopicEntry,
+  limit?: number,
+): RecentTopicEntry[] {
+  const merged = dedupeRecentTopics([next, ...entries]);
+  return limit !== undefined && limit > 0 ? merged.slice(0, limit) : merged;
+}
+
+export function findRecentTopicMatch(
+  entries: RecentTopicEntry[],
+  topicValue: string,
+): RecentTopicEntry | null {
+  const normalized = topicValue.trim().toLocaleLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  for (const entry of entries) {
+    if (entry.topic.trim().toLocaleLowerCase() === normalized) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+export function filterRecentTopics(
+  entries: RecentTopicEntry[],
+  query: string,
+): RecentTopicEntry[] {
+  const normalized = query.trim().toLocaleLowerCase();
+  if (!normalized) {
+    return [];
+  }
+  return entries.filter((entry) =>
+    entry.topic.toLocaleLowerCase().includes(normalized),
+  );
 }
 
 export function resetRecording(model: AppModel): AppModel {

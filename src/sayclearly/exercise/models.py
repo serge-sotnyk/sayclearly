@@ -7,7 +7,6 @@ class ExerciseGenerationRequest(BaseModel):
     language: str
     analysis_language: str
     topic_prompt: str
-    reuse_last_topic: bool
 
 
 class ExerciseGenerationResponse(BaseModel):

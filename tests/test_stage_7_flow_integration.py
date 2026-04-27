@@ -53,7 +53,6 @@ def test_stage_7_happy_path_saves_history_and_reuses_topic(
             "analysis_language": "uk",
             "same_language_for_analysis": False,
             "ui_language": config["ui_language"],
-            "last_topic_prompt": "Order coffee before work",
             "session_limit": config["session_limit"],
             "keep_last_audio": config["keep_last_audio"],
             "gemini": {
@@ -76,8 +75,7 @@ def test_stage_7_happy_path_saves_history_and_reuses_topic(
         json={
             "language": "en",
             "analysis_language": "uk",
-            "topic_prompt": "",
-            "reuse_last_topic": True,
+            "topic_prompt": "Order coffee before work",
         },
     ).json()
 
@@ -111,7 +109,6 @@ def test_stage_7_happy_path_saves_history_and_reuses_topic(
             "language": "en",
             "analysis_language": "uk",
             "topic_prompt": detail.json()["topic_prompt"],
-            "reuse_last_topic": False,
         },
     )
 

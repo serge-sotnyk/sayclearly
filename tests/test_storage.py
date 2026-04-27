@@ -69,7 +69,6 @@ def test_load_config_migrates_version_1_gemini_model_to_version_2_schema(tmp_pat
                 "analysis_language": "uk",
                 "ui_language": "en",
                 "same_language_for_analysis": False,
-                "last_topic_prompt": "legacy prompt",
                 "session_limit": 222,
                 "keep_last_audio": True,
                 "gemini": {"model": "gemini-2.5-flash"},
@@ -92,7 +91,6 @@ def test_load_config_migrates_version_1_gemini_model_to_version_2_schema(tmp_pat
         "analysis_language": "uk",
         "ui_language": "en",
         "same_language_for_analysis": False,
-        "last_topic_prompt": "legacy prompt",
         "session_limit": 222,
         "keep_last_audio": True,
         "gemini": {
@@ -126,7 +124,6 @@ def test_load_config_migrates_version_1_without_gemini_model_using_defaults(
         "analysis_language": "uk",
         "ui_language": "en",
         "same_language_for_analysis": True,
-        "last_topic_prompt": "",
         "session_limit": 300,
         "keep_last_audio": False,
         "gemini": {
@@ -418,3 +415,123 @@ def test_load_config_raises_storage_error_for_invalid_utf8(tmp_path: Path) -> No
 
     with pytest.raises(StorageError, match="Could not read"):
         load_config(tmp_path)
+
+
+def test_load_config_strips_obsolete_last_topic_prompt_field(tmp_path: Path) -> None:
+    load_config(tmp_path)
+    (tmp_path / "config.json").write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "text_language": "uk",
+                "analysis_language": "uk",
+                "ui_language": "en",
+                "same_language_for_analysis": True,
+                "last_topic_prompt": "carry-over prompt",
+                "session_limit": 300,
+                "keep_last_audio": False,
+                "gemini": {
+                    "text_model": "gemini-3-flash-preview",
+                    "analysis_model": "gemini-3-flash-preview",
+                    "same_model_for_analysis": True,
+                    "text_thinking_level": "high",
+                },
+                "langfuse": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(tmp_path)
+
+    assert config.text_language == "uk"
+    rewritten = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    assert "last_topic_prompt" not in rewritten
+
+
+def test_history_session_round_trips_analysis_language(tmp_path: Path) -> None:
+    load_config(tmp_path)
+    history = HistoryStore.model_validate(
+        {
+            "version": 1,
+            "sessions": [
+                {
+                    "id": "session-1",
+                    "created_at": "2026-04-21T10:30:45Z",
+                    "language": "Ukrainian",
+                    "analysis_language": "English",
+                    "topic_prompt": "Talk about your day",
+                    "text": "Sample transcript",
+                    "analysis": {
+                        "clarity_score": 80,
+                        "pace_score": 75,
+                        "hesitations": [],
+                        "summary": [],
+                    },
+                }
+            ],
+        }
+    )
+
+    save_history(tmp_path, history)
+    reloaded = load_history(tmp_path)
+
+    assert reloaded.sessions[0].analysis_language == "English"
+
+
+def test_history_session_loads_legacy_payload_without_analysis_language() -> None:
+    history = HistoryStore.model_validate(
+        {
+            "version": 1,
+            "sessions": [
+                {
+                    "id": "session-1",
+                    "created_at": "2026-04-21T10:30:45Z",
+                    "language": "Ukrainian",
+                    "topic_prompt": "Talk about your day",
+                    "text": "Sample transcript",
+                    "analysis": {
+                        "clarity_score": 80,
+                        "pace_score": 75,
+                        "hesitations": [],
+                        "summary": [],
+                    },
+                }
+            ],
+        }
+    )
+
+    assert history.sessions[0].analysis_language is None
+
+
+def test_save_history_preserves_non_ascii_without_unicode_escapes(tmp_path: Path) -> None:
+    load_config(tmp_path)
+    history = HistoryStore.model_validate(
+        {
+            "version": 1,
+            "sessions": [
+                {
+                    "id": "session-1",
+                    "created_at": "2026-04-21T10:30:45Z",
+                    "language": "Ukrainian",
+                    "analysis_language": "Ukrainian",
+                    "topic_prompt": "цікаві факти про каву",
+                    "text": "Привіт, як справи?",
+                    "analysis": {
+                        "clarity_score": 80,
+                        "pace_score": 75,
+                        "hesitations": [],
+                        "summary": ["Чітке мовлення"],
+                    },
+                }
+            ],
+        }
+    )
+
+    save_history(tmp_path, history)
+
+    raw = (tmp_path / "history.json").read_text(encoding="utf-8")
+    assert "цікаві факти про каву" in raw
+    assert "Привіт, як справи?" in raw
+    assert "Чітке мовлення" in raw
+    assert "\\u0446" not in raw

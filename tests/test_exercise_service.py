@@ -4,10 +4,11 @@ import pytest
 
 from sayclearly.exercise.models import ExerciseGenerationRequest
 from sayclearly.exercise.service import (
+    ExerciseGenerationProviderError,
     ExerciseService,
     ExerciseServiceConfigurationError,
 )
-from sayclearly.gemini.client import GeneratedExercise
+from sayclearly.gemini.client import GeminiProviderError, GeneratedExercise
 from sayclearly.storage.files import (
     load_config,
     load_history,
@@ -50,35 +51,6 @@ def make_history_session(session_id: str, text: str) -> HistorySession:
             summary=["steady reading"],
         ),
     )
-
-
-def test_generate_text_reuses_last_topic_when_requested(tmp_path: Path) -> None:
-    config = load_config(tmp_path)
-    save_config(
-        tmp_path,
-        config.model_copy(update={"last_topic_prompt": "quiet forest mornings"}),
-    )
-    secrets = load_secrets(tmp_path)
-    save_secrets(
-        tmp_path,
-        secrets.model_copy(
-            update={"gemini": secrets.gemini.model_copy(update={"api_key": "stored-key"})}
-        ),
-    )
-    client = FakeGeminiClient(GeneratedExercise(text="Quiet mornings make speech feel calmer."))
-    service = ExerciseService(tmp_path, gemini_client=client)
-
-    response = service.generate_text(
-        ExerciseGenerationRequest(
-            language="en",
-            analysis_language="uk",
-            topic_prompt="   ",
-            reuse_last_topic=True,
-        )
-    )
-
-    assert response.topic_prompt == "quiet forest mornings"
-    assert client.calls[0]["model"] == load_config(tmp_path).gemini.text_model
 
 
 def test_generate_text_uses_recent_history_and_configured_generation_settings(
@@ -127,7 +99,6 @@ def test_generate_text_uses_recent_history_and_configured_generation_settings(
             language="en",
             analysis_language="uk",
             topic_prompt="morning coffee routines",
-            reuse_last_topic=False,
         )
     )
 
@@ -177,7 +148,6 @@ def test_generate_text_scopes_recent_history_to_request_language(tmp_path: Path)
             language="en",
             analysis_language="uk",
             topic_prompt="morning coffee routines",
-            reuse_last_topic=False,
         )
     )
 
@@ -205,7 +175,6 @@ def test_generate_text_uses_default_generation_settings_when_not_overridden(
             language="en",
             analysis_language="uk",
             topic_prompt="morning coffee routines",
-            reuse_last_topic=False,
         )
     )
 
@@ -250,7 +219,6 @@ def test_generate_text_sanitizes_unsupported_stored_text_model(tmp_path: Path) -
             language="en",
             analysis_language="uk",
             topic_prompt="morning coffee routines",
-            reuse_last_topic=False,
         )
     )
 
@@ -272,6 +240,25 @@ def test_generate_text_requires_a_configured_gemini_api_key(tmp_path: Path) -> N
                 language="en",
                 analysis_language="uk",
                 topic_prompt="clear consonants",
-                reuse_last_topic=False,
+            )
+        )
+
+
+def test_generate_text_propagates_provider_message_with_gemini_prefix(tmp_path: Path) -> None:
+    class FailingClient:
+        def generate_exercise(self, *, prompt, model, thinking_level):
+            raise GeminiProviderError("This model is currently experiencing high demand.")
+
+    service = ExerciseService(tmp_path, gemini_client=FailingClient())
+
+    with pytest.raises(
+        ExerciseGenerationProviderError,
+        match=r"^Gemini: This model is currently experiencing high demand\.$",
+    ):
+        service.generate_text(
+            ExerciseGenerationRequest(
+                language="en",
+                analysis_language="uk",
+                topic_prompt="any topic",
             )
         )

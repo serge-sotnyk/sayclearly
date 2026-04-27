@@ -35,7 +35,6 @@ class StoredConfig(BaseModel):
     analysis_language: str = "uk"
     ui_language: str = "en"
     same_language_for_analysis: bool = True
-    last_topic_prompt: str = ""
     session_limit: int = Field(default=300, gt=0)
     keep_last_audio: bool = False
     gemini: GeminiConfig = Field(default_factory=GeminiConfig)
@@ -92,6 +91,7 @@ class HistorySession(BaseModel):
     id: str
     created_at: str
     language: str
+    analysis_language: str | None = None
     topic_prompt: str | None = None
     text: str
     analysis: SessionAnalysis

@@ -53,7 +53,7 @@ def atomic_write_json(path: Path, data: dict[str, object]) -> None:
 
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=True, indent=2)
+            json.dump(data, handle, ensure_ascii=False, indent=2)
             handle.write("\n")
         os.replace(temporary_path, path)
     except OSError as exc:
@@ -78,7 +78,6 @@ def _build_product_default_config() -> StoredConfig:
             "analysis_language": "uk",
             "ui_language": "en",
             "same_language_for_analysis": True,
-            "last_topic_prompt": "",
             "session_limit": 300,
             "keep_last_audio": False,
             "gemini": {
@@ -128,13 +127,14 @@ def load_config(data_root: Path | None = None) -> StoredConfig:
 
     payload = _load_json_payload(path)
     migrated_payload = _migrate_config_payload(payload, default_config)
+    cleaned_payload = _strip_obsolete_config_keys(migrated_payload)
 
     try:
-        config = StoredConfig.model_validate(migrated_payload)
+        config = StoredConfig.model_validate(cleaned_payload)
     except ValidationError as exc:
         raise StorageError(f"Invalid data in {path}") from exc
 
-    if migrated_payload != payload:
+    if cleaned_payload != payload:
         atomic_write_json(path, config.model_dump(mode="json", exclude_none=True))
 
     return config
@@ -181,6 +181,17 @@ def _migrate_config_payload(payload: Any, default_config: StoredConfig) -> Any:
         "text_thinking_level": "high",
     }
     return migrated_payload
+
+
+_OBSOLETE_CONFIG_KEYS: frozenset[str] = frozenset({"last_topic_prompt"})
+
+
+def _strip_obsolete_config_keys(payload: Any) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+    if not _OBSOLETE_CONFIG_KEYS.intersection(payload):
+        return payload
+    return {key: value for key, value in payload.items() if key not in _OBSOLETE_CONFIG_KEYS}
 
 
 def load_secrets(data_root: Path | None = None) -> StoredSecrets:

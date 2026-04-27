@@ -1,6 +1,11 @@
+import json
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from sayclearly.app import create_app
+from sayclearly.history.service import HistoryService
+from sayclearly.storage.models import HistorySession, SessionAnalysis
 
 
 def test_home_page_renders_stage_3_shell() -> None:
@@ -144,3 +149,76 @@ def test_home_page_renders_stage_8_trust_copy() -> None:
     assert "Recordings are temporary and are deleted after each analysis attempt." in response.text
     assert "data-telemetry-note" in response.text
     assert "data-local-storage-note" in response.text
+
+
+def test_home_page_renders_history_modal_and_button(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    service.save_session(
+        HistorySession(
+            id="01",
+            created_at="2026-04-20T10:00:01",
+            language="Ukrainian",
+            analysis_language="English",
+            topic_prompt="rust facts",
+            text="t1",
+            analysis=SessionAnalysis(clarity_score=80, pace_score=70, summary=["ok"]),
+        )
+    )
+    service.save_session(
+        HistorySession(
+            id="02",
+            created_at="2026-04-20T10:00:02",
+            language="English",
+            analysis_language="English",
+            topic_prompt="ordering coffee",
+            text="t2",
+            analysis=SessionAnalysis(clarity_score=80, pace_score=70, summary=["ok"]),
+        )
+    )
+    client = TestClient(create_app(tmp_path))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "data-reuse-topic-button" not in response.text
+    assert "data-history-button" in response.text
+    assert "data-history-modal" in response.text
+    assert "data-history-modal-search" in response.text
+    assert "data-history-modal-matches-list" in response.text
+    assert "data-history-modal-all-list" in response.text
+    assert "data-recent-topics-payload" in response.text
+    assert 'value="ordering coffee"' in response.text
+
+    payload_marker = "data-recent-topics-payload>"
+    start = response.text.index(payload_marker) + len(payload_marker)
+    end = response.text.index("</script>", start)
+    payload = json.loads(response.text[start:end])
+    assert [entry["topic"] for entry in payload] == ["ordering coffee", "rust facts"]
+
+
+def test_home_page_handles_empty_history_for_recent_topics(tmp_path: Path) -> None:
+    client = TestClient(create_app(tmp_path))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "data-history-modal" in response.text
+    assert "data-recent-topics-payload" in response.text
+
+
+def test_history_modal_lives_inside_app_root_so_collect_shell_elements_can_find_it() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    body = response.text
+    main_open = body.index("<main")
+    main_close = body.index("</main>")
+    modal_marker = body.index("data-history-modal")
+    assert main_open < modal_marker < main_close, (
+        "History modal must be a descendant of <main data-app-root> so that "
+        "collectShellElements (which scopes its querySelector calls to the app root) "
+        "can locate it on startup. If it sits outside <main>, the JS bootstrap "
+        "throws and the setup/exercise/settings panels render uncontrolled."
+    )

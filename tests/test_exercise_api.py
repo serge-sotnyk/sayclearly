@@ -12,12 +12,7 @@ from sayclearly.exercise.service import (
     ExerciseServiceConfigurationError,
 )
 from sayclearly.gemini.client import GeneratedExercise
-from sayclearly.storage.files import (
-    load_config,
-    load_secrets,
-    save_config,
-    save_secrets,
-)
+from sayclearly.storage.files import load_config, save_config
 
 
 def make_payload() -> dict[str, object]:
@@ -25,7 +20,6 @@ def make_payload() -> dict[str, object]:
         "language": "en",
         "analysis_language": "uk",
         "topic_prompt": "clear speech warmup",
-        "reuse_last_topic": False,
     }
 
 
@@ -53,7 +47,6 @@ def test_post_generate_text_returns_generated_exercise(
             "analysis_language": "uk",
             "same_language_for_analysis": False,
             "ui_language": "en",
-            "last_topic_prompt": "clear speech warmup",
             "session_limit": 300,
             "keep_last_audio": False,
             "gemini": {
@@ -82,43 +75,6 @@ def test_post_generate_text_returns_generated_exercise(
     assert "placeholder" not in response.json()["text"].lower()
 
 
-def test_post_generate_text_can_reuse_last_topic_from_config(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "sayclearly.exercise.service.GeminiClient.generate_exercise",
-        lambda self, *, prompt, model, thinking_level: GeneratedExercise(
-            text="Start gently, then keep the ending of every phrase controlled."
-        ),
-    )
-    config = load_config(tmp_path)
-    save_config(
-        tmp_path,
-        config.model_copy(update={"last_topic_prompt": "slow breathing before speaking"}),
-    )
-    secrets = load_secrets(tmp_path)
-    save_secrets(
-        tmp_path,
-        secrets.model_copy(
-            update={"gemini": secrets.gemini.model_copy(update={"api_key": "stored-key"})}
-        ),
-    )
-    client = TestClient(create_app(tmp_path))
-
-    response = client.post(
-        "/api/generate-text",
-        json={
-            "language": "en",
-            "analysis_language": "uk",
-            "topic_prompt": " ",
-            "reuse_last_topic": True,
-        },
-    )
-
-    assert response.status_code == 200
-    assert response.json()["topic_prompt"] == "slow breathing before speaking"
-
-
 def test_post_generate_text_returns_400_when_gemini_api_key_is_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -136,13 +92,15 @@ def test_post_generate_text_returns_400_when_gemini_api_key_is_missing(
     assert "Gemini API key" in response.json()["detail"]
 
 
-def test_post_generate_text_returns_calm_provider_error_without_raw_sdk_details(
+def test_post_generate_text_returns_provider_message_in_detail(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
         "sayclearly.exercise.service.ExerciseService.generate_text",
         lambda self, payload: (_ for _ in ()).throw(
-            ExerciseGenerationProviderError("503 backend meltdown from provider")
+            ExerciseGenerationProviderError(
+                "Gemini: This model is currently experiencing high demand."
+            )
         ),
     )
     client = TestClient(create_app(tmp_path))
@@ -150,8 +108,7 @@ def test_post_generate_text_returns_calm_provider_error_without_raw_sdk_details(
     response = client.post("/api/generate-text", json=make_payload())
 
     assert response.status_code == 502
-    assert "provider" not in response.json()["detail"].lower()
-    assert "meltdown" not in response.json()["detail"].lower()
+    assert response.json()["detail"] == "Gemini: This model is currently experiencing high demand."
 
 
 def test_post_generate_text_returns_clear_invalid_credentials_error(

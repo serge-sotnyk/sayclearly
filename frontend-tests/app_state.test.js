@@ -12,7 +12,11 @@ import {
   buildConfigUpdatePayload,
   buildGenerateRequest,
   createInitialAppModel,
+  dedupeRecentTopics,
+  filterRecentTopics,
+  findRecentTopicMatch,
   markRecordingStarted,
+  pushRecentTopic,
   resetRecording,
   startRecordingAnalysis,
   startRecordingRequest,
@@ -26,7 +30,6 @@ const publicConfig = {
   analysis_language: 'en',
   same_language_for_analysis: false,
   ui_language: 'uk',
-  last_topic_prompt: 'Keep the original config topic',
   session_limit: 8,
   keep_last_audio: true,
   gemini: {
@@ -121,7 +124,6 @@ test('syncAnalysisLanguage copies text language when toggle is enabled', () => {
     same_model_for_analysis: false,
     text_thinking_level: 'medium',
     topic_prompt: 'A short weather forecast',
-    reuse_last_topic: false,
   };
 
   assert.deepEqual(syncAnalysisLanguage(settings), {
@@ -170,12 +172,12 @@ test('applyGenerationError moves flow into error', () => {
   assert.equal(updatedModel.error_message, 'Generation failed');
 });
 
-test('applyLoadedConfig keeps reuse_last_topic as explicit user intent on load', () => {
+test('applyLoadedConfig seeds settings from the public config and starts with a blank topic', () => {
   const model = createInitialAppModel();
   const loadedModel = applyLoadedConfig(model, publicConfig);
 
-  assert.equal(loadedModel.settings.topic_prompt, 'Keep the original config topic');
-  assert.equal(loadedModel.settings.reuse_last_topic, false);
+  assert.equal(loadedModel.settings.topic_prompt, '');
+  assert.equal(loadedModel.settings.text_language, 'uk');
 });
 
 test('buildGenerateRequest and buildConfigUpdatePayload preserve current config values outside stage 3 form', () => {
@@ -188,14 +190,12 @@ test('buildGenerateRequest and buildConfigUpdatePayload preserve current config 
     same_model_for_analysis: false,
     text_thinking_level: 'medium',
     topic_prompt: 'Describe a quiet library',
-    reuse_last_topic: true,
   };
 
   assert.deepEqual(buildGenerateRequest(settings), {
     language: 'pl',
     analysis_language: 'pl',
     topic_prompt: 'Describe a quiet library',
-    reuse_last_topic: true,
   });
 
   assert.deepEqual(buildConfigUpdatePayload(publicConfig, settings), {
@@ -203,43 +203,6 @@ test('buildGenerateRequest and buildConfigUpdatePayload preserve current config 
     analysis_language: 'pl',
     same_language_for_analysis: true,
     ui_language: 'uk',
-    last_topic_prompt: 'Describe a quiet library',
-    session_limit: 8,
-    keep_last_audio: true,
-    gemini: {
-      text_model: 'gemini-3-flash-preview',
-      analysis_model: 'gemini-3.1-flash-lite-preview',
-      same_model_for_analysis: false,
-      text_thinking_level: 'medium',
-      api_key: null,
-    },
-    langfuse: {
-      host: 'https://langfuse.example',
-      public_key: null,
-      secret_key: null,
-    },
-  });
-});
-
-test('buildConfigUpdatePayload preserves stored last_topic_prompt when reusing a blank input', () => {
-  const settings = {
-    text_language: 'pl',
-    analysis_language: 'en',
-    same_language_for_analysis: false,
-    text_model: 'gemini-3-flash-preview',
-    analysis_model: 'gemini-3.1-flash-lite-preview',
-    same_model_for_analysis: false,
-    text_thinking_level: 'medium',
-    topic_prompt: '',
-    reuse_last_topic: true,
-  };
-
-  assert.deepEqual(buildConfigUpdatePayload(publicConfig, settings), {
-    text_language: 'pl',
-    analysis_language: 'en',
-    same_language_for_analysis: false,
-    ui_language: 'uk',
-    last_topic_prompt: 'Keep the original config topic',
     session_limit: 8,
     keep_last_audio: true,
     gemini: {
@@ -267,7 +230,6 @@ test('buildConfigUpdatePayload keeps analysis model aligned when same model is e
     same_model_for_analysis: true,
     text_thinking_level: 'medium',
     topic_prompt: 'Describe a market square',
-    reuse_last_topic: false,
   };
 
   const config = {
@@ -357,4 +319,95 @@ test('applyAnalysisResult enters review and resetRecording clears recording stat
   assert.equal(resetModel.has_recording, false);
   assert.equal(resetModel.review, null);
   assert.equal(resetModel.recording_error, null);
+});
+
+test('dedupeRecentTopics drops empty topics and keeps the freshest casing', () => {
+  const entries = [
+    { topic: 'rust facts', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    { topic: '   ', text_language: 'English', analysis_language: 'English' },
+    { topic: 'RUST FACTS', text_language: 'English', analysis_language: 'English' },
+    { topic: 'ordering coffee', text_language: 'English', analysis_language: 'English' },
+  ];
+
+  assert.deepEqual(dedupeRecentTopics(entries), [
+    { topic: 'rust facts', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    { topic: 'ordering coffee', text_language: 'English', analysis_language: 'English' },
+  ]);
+});
+
+test('pushRecentTopic prepends the new entry and respects the optional limit', () => {
+  const existing = [
+    { topic: 'rust facts', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    { topic: 'ordering coffee', text_language: 'English', analysis_language: 'English' },
+  ];
+
+  const next = pushRecentTopic(
+    existing,
+    { topic: 'history of kyiv', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    2,
+  );
+
+  assert.deepEqual(next, [
+    { topic: 'history of kyiv', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    { topic: 'rust facts', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+  ]);
+
+  const unbounded = pushRecentTopic(existing, {
+    topic: 'history of kyiv',
+    text_language: 'Ukrainian',
+    analysis_language: 'Ukrainian',
+  });
+
+  assert.equal(unbounded.length, 3);
+  assert.equal(unbounded[0].topic, 'history of kyiv');
+});
+
+test('pushRecentTopic moves an existing topic to the front with the freshest casing', () => {
+  const existing = [
+    { topic: 'rust facts', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    { topic: 'ordering coffee', text_language: 'English', analysis_language: 'English' },
+  ];
+
+  const next = pushRecentTopic(existing, {
+    topic: 'Ordering Coffee',
+    text_language: 'English',
+    analysis_language: 'English',
+  });
+
+  assert.deepEqual(next, [
+    { topic: 'Ordering Coffee', text_language: 'English', analysis_language: 'English' },
+    { topic: 'rust facts', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+  ]);
+});
+
+test('findRecentTopicMatch matches case-insensitively after trim', () => {
+  const entries = [
+    { topic: 'rust facts', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    { topic: 'ordering coffee', text_language: 'English', analysis_language: 'English' },
+  ];
+
+  assert.deepEqual(findRecentTopicMatch(entries, '  RUST FACTS  '), {
+    topic: 'rust facts',
+    text_language: 'Ukrainian',
+    analysis_language: 'Ukrainian',
+  });
+  assert.equal(findRecentTopicMatch(entries, 'something else'), null);
+  assert.equal(findRecentTopicMatch(entries, '   '), null);
+});
+
+test('filterRecentTopics returns substring matches preserving order, empty for blank query', () => {
+  const entries = [
+    { topic: 'rust facts', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    { topic: 'history of kyiv', text_language: 'Ukrainian', analysis_language: 'Ukrainian' },
+    { topic: 'ordering coffee', text_language: 'English', analysis_language: 'English' },
+  ];
+
+  assert.deepEqual(filterRecentTopics(entries, 'FACTS').map((entry) => entry.topic), [
+    'rust facts',
+  ]);
+  assert.deepEqual(filterRecentTopics(entries, 'o').map((entry) => entry.topic), [
+    'history of kyiv',
+    'ordering coffee',
+  ]);
+  assert.deepEqual(filterRecentTopics(entries, '   '), []);
 });

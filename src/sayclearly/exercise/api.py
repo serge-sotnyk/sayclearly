@@ -53,10 +53,7 @@ def build_exercise_router(data_root: Path | None = None) -> APIRouter:
         except ExerciseGenerationInvalidCredentialsError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except ExerciseGenerationProviderError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail="Text generation is unavailable right now. Please try again.",
-            ) from exc
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         except StorageError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from sayclearly.gemini.client import GeminiProviderError
 from sayclearly.recording.models import AudioAnalysisMetadata, RecordingAnalysisResult
 from sayclearly.recording.service import (
     TEMP_RECORDINGS_DIR_NAME,
@@ -87,7 +88,7 @@ def test_analyze_recording_deletes_temp_file_after_provider_failure(tmp_path: Pa
     service._gemini_client = fake_client
     metadata = AudioAnalysisMetadata(language="uk", analysis_language="uk", exercise_text="Text.")
 
-    with pytest.raises(RecordingAnalysisProviderError, match="unavailable"):
+    with pytest.raises(RecordingAnalysisProviderError, match="provider down"):
         service.analyze_recording(
             audio_bytes=b"temp bytes",
             filename="sample.webm",
@@ -97,6 +98,28 @@ def test_analyze_recording_deletes_temp_file_after_provider_failure(tmp_path: Pa
 
     temp_dir = tmp_path / CACHE_DIR_NAME / TEMP_RECORDINGS_DIR_NAME
     assert list(temp_dir.iterdir()) == []
+
+
+def test_analyze_recording_propagates_provider_message_with_gemini_prefix(
+    tmp_path: Path,
+) -> None:
+    fake_client = MagicMock()
+    fake_client.analyze_audio.side_effect = GeminiProviderError(
+        "Service is currently overloaded. Try again later."
+    )
+    service = RecordingService(tmp_path, gemini_client=fake_client)
+    metadata = AudioAnalysisMetadata(language="uk", analysis_language="uk", exercise_text="Text.")
+
+    with pytest.raises(
+        RecordingAnalysisProviderError,
+        match=r"^Gemini: Service is currently overloaded\. Try again later\.$",
+    ):
+        service.analyze_recording(
+            audio_bytes=b"temp bytes",
+            filename="sample.webm",
+            content_type="audio/webm",
+            metadata=metadata,
+        )
 
 
 def test_analyze_recording_rejects_empty_upload(tmp_path: Path) -> None:

@@ -30,7 +30,6 @@ def test_stage_3_happy_path_loads_config_saves_and_generates_text(
             "analysis_language": "uk",
             "same_language_for_analysis": False,
             "ui_language": config["ui_language"],
-            "last_topic_prompt": "Order coffee before work",
             "session_limit": config["session_limit"],
             "keep_last_audio": config["keep_last_audio"],
             "gemini": {
@@ -50,15 +49,13 @@ def test_stage_3_happy_path_loads_config_saves_and_generates_text(
 
     assert save_response.status_code == 200
     assert save_response.json()["text_language"] == "en"
-    assert save_response.json()["last_topic_prompt"] == "Order coffee before work"
 
     generate_response = client.post(
         "/api/generate-text",
         json={
             "language": "en",
             "analysis_language": "uk",
-            "topic_prompt": "",
-            "reuse_last_topic": True,
+            "topic_prompt": "Order coffee before work",
         },
     )
 

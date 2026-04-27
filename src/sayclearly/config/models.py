@@ -74,7 +74,6 @@ class ConfigUpdatePayload(BaseModel):
     analysis_language: NonEmptyString
     same_language_for_analysis: bool
     ui_language: NonEmptyString
-    last_topic_prompt: str
     session_limit: int = Field(gt=0)
     keep_last_audio: bool
     gemini: GeminiConfigUpdate
@@ -117,7 +116,6 @@ class PublicConfigView(BaseModel):
     analysis_language: str
     same_language_for_analysis: bool
     ui_language: str
-    last_topic_prompt: str
     session_limit: int
     keep_last_audio: bool
     gemini: GeminiPublicConfig
