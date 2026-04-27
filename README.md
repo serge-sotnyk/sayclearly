@@ -64,7 +64,10 @@ This is the intended MVP launch path. It starts the local FastAPI server and ope
 ```bash
 npm install
 uv sync
+uv run pre-commit install
 ```
+
+`pre-commit install` wires up a hook that rebuilds the frontend bundle and refuses commits where the bundle would not match the staged TypeScript sources. Run it once after every fresh clone.
 
 ### Local development run
 

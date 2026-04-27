@@ -90,11 +90,15 @@ def test_home_page_uses_root_path_for_stage_3_bundle() -> None:
 def test_frontend_bundle_is_served_with_generate_endpoint_reference() -> None:
     client = TestClient(create_app())
 
-    response = client.get("/static/dist/app.js")
+    bundle_response = client.get("/static/dist/app.js")
+    api_client_response = client.get("/static/dist/api_client.js")
 
-    assert response.status_code == 200
-    assert "javascript" in response.headers["content-type"]
-    assert "/api/generate-text" in response.text
+    assert bundle_response.status_code == 200
+    assert "javascript" in bundle_response.headers["content-type"]
+    assert api_client_response.status_code == 200
+    assert "javascript" in api_client_response.headers["content-type"]
+    # API endpoints live in the centralized api_client module since A2.
+    assert "/api/generate-text" in api_client_response.text
 
 
 def test_stylesheet_preserves_hidden_attribute_behavior() -> None:

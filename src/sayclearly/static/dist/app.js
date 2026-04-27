@@ -1,4 +1,5 @@
 import { advanceExerciseStep, applyAnalysisError, applyAnalysisResult, applyGeneratedExercise, applyGenerationError, applyHistoryDetails, applyHistoryError, applyHistoryLoaded, applyHistorySaveError, applyLoadedConfig, applyRecordingError, buildConfigUpdatePayload, buildGenerateRequest, createInitialAppModel, dedupeRecentTopics, enterHistory, filterRecentTopics, findRecentTopicMatch, markRecordingStarted, pushRecentTopic, resetRecording, returnFromHistory, reuseTopic, startNewSession, startRecordingAnalysis, startRecordingRequest, startGeneration, storeRecordedAudio, syncAnalysisModel, syncAnalysisLanguage, } from './app_state.js';
+import { RequestError, analyzeRecording, deleteApiKey, fetchConfig, generateExercise, getRequestErrorMessage, getRequestErrorMessageWithDetail, loadHistory, loadHistorySession, saveConfig, saveHistorySession, } from './api_client.js';
 const READY_STATUS = 'Ready to generate a guided exercise.';
 const LOADING_STATUS = 'Loading your saved settings...';
 const GENERATING_STATUS = 'Generating your guided exercise...';
@@ -31,14 +32,6 @@ const STEP_CONTENT = {
         nextButtonDisabled: true,
     },
 };
-class RequestError extends Error {
-    detail;
-    constructor(message, detail = null) {
-        super(message);
-        this.name = 'RequestError';
-        this.detail = detail;
-    }
-}
 function createDefaultRecordingApi() {
     return {
         isSupported() {
@@ -276,47 +269,6 @@ function buildConfigRequest(config, settings, apiKeyValue) {
         },
     };
 }
-async function requestJson(fetchImpl, url, options) {
-    const headers = options?.body instanceof FormData
-        ? { ...(options?.headers ?? {}) }
-        : {
-            'Content-Type': 'application/json',
-            ...(options?.headers ?? {}),
-        };
-    const response = await fetchImpl(url, {
-        ...options,
-        headers,
-    });
-    if (!response.ok) {
-        let detail = null;
-        try {
-            const body = (await response.json());
-            if (typeof body.detail === 'string' && body.detail.trim() !== '') {
-                detail = body.detail;
-            }
-        }
-        catch {
-            detail = null;
-        }
-        throw new RequestError(`Request failed: ${url}`, detail);
-    }
-    return (await response.json());
-}
-function getRequestErrorMessage(error, fallback) {
-    return error instanceof RequestError && error.detail !== null ? error.detail : fallback;
-}
-function getRequestErrorMessageWithDetail(error, fallback) {
-    if (!(error instanceof RequestError) || error.detail === null || error.detail === '') {
-        return fallback;
-    }
-    // Provider-side errors are tagged "Gemini: ..." in the backend service layer.
-    // Wrap them with the friendly fallback so the user sees both context and cause.
-    // Other 4xx details (auth, config) are already complete sentences and replace the fallback.
-    if (error.detail.startsWith('Gemini:')) {
-        return `${fallback} (${error.detail})`;
-    }
-    return error.detail;
-}
 function createClientSessionId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID();
@@ -333,18 +285,6 @@ function buildHistorySession(exercise, analysis) {
         text: exercise.text,
         analysis,
     };
-}
-async function loadHistory(fetchImpl) {
-    return await requestJson(fetchImpl, '/api/history', { method: 'GET' });
-}
-async function loadHistorySession(fetchImpl, sessionId) {
-    return await requestJson(fetchImpl, `/api/history/${sessionId}`, { method: 'GET' });
-}
-async function saveHistorySession(fetchImpl, session) {
-    return await requestJson(fetchImpl, '/api/history', {
-        method: 'POST',
-        body: JSON.stringify(session),
-    });
 }
 function render(documentRef, elements, model, isSettingsOpen, transientBannerMessage, recordedUrl, fetchImpl, clearRecordingArtifacts) {
     renderModelOptions(documentRef, elements.textModelSelect, model.config.gemini.available_models);
@@ -911,11 +851,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                 });
                 formData.append('metadata', metadata);
             }
-            const result = await requestJson(fetchImpl, '/api/analyze-recording', {
-                method: 'POST',
-                body: formData,
-                signal: controller.signal,
-            });
+            const result = await analyzeRecording(fetchImpl, formData, controller.signal);
             const latestSession = buildHistorySession(model.generated_exercise, result.analysis);
             model = applyAnalysisResult(model, result, latestSession);
             try {
@@ -963,9 +899,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     });
     elements.clearApiKeyButton.addEventListener('click', async () => {
         try {
-            const config = await requestJson(fetchImpl, '/api/config/api-key', {
-                method: 'DELETE',
-            });
+            const config = await deleteApiKey(fetchImpl);
             model = {
                 ...model,
                 config,
@@ -1068,10 +1002,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
             let configForSave = model.config;
             if (!hasLoadedConfig) {
                 try {
-                    configForSave = await requestJson(fetchImpl, '/api/config', {
-                        method: 'GET',
-                        signal: controller.signal,
-                    });
+                    configForSave = await fetchConfig(fetchImpl, controller.signal);
                     model = {
                         ...applyLoadedConfig(model, configForSave),
                         settings,
@@ -1085,22 +1016,14 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
                     throw new RequestError('Request failed: /api/config', getRequestErrorMessage(error, LOAD_ERROR_STATUS));
                 }
             }
-            const savedConfig = await requestJson(fetchImpl, '/api/config', {
-                method: 'POST',
-                body: JSON.stringify(buildConfigRequest(configForSave, settings, elements.apiKeyInput.value)),
-                signal: controller.signal,
-            });
+            const savedConfig = await saveConfig(fetchImpl, buildConfigRequest(configForSave, settings, elements.apiKeyInput.value), controller.signal);
             hasLoadedConfig = true;
             model = {
                 ...model,
                 config: savedConfig,
                 settings,
             };
-            const exercise = await requestJson(fetchImpl, '/api/generate-text', {
-                method: 'POST',
-                body: JSON.stringify(buildGenerateRequest(settings)),
-                signal: controller.signal,
-            });
+            const exercise = await generateExercise(fetchImpl, buildGenerateRequest(settings), controller.signal);
             model = applyGeneratedExercise(model, exercise);
         }
         catch (error) {
@@ -1140,9 +1063,7 @@ export async function startApp(documentRef = document, fetchImpl = fetch, record
     };
     render(documentRef, elements, model, isSettingsOpen, transientBannerMessage, recordedUrl, fetchImpl, clearRecordingArtifacts);
     try {
-        const config = await requestJson(fetchImpl, '/api/config', {
-            method: 'GET',
-        });
+        const config = await fetchConfig(fetchImpl);
         const seededTopic = initialPageData.initial_topic;
         model = applyLoadedConfig(model, config);
         if (seededTopic) {

@@ -21,13 +21,14 @@ sayclearly = "sayclearly.main:main"
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "pre-commit>=4.6.0",
     "pytest>=9.0.3",
     "ruff>=0.15.11",
 ]
 
 [tool.ruff]
 target-version = "py313"
-line-length = 100
+line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

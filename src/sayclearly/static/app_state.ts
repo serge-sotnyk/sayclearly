@@ -171,13 +171,13 @@ export interface RecordingAnalysisResult {
 
 type HistoryOrigin = 'review' | 'home' | null;
 
-interface GenerateRequest {
+export interface GenerateRequest {
   language: string;
   analysis_language: string;
   topic_prompt: string;
 }
 
-interface ConfigUpdatePayload {
+export interface ConfigUpdatePayload {
   text_language: string;
   analysis_language: string;
   same_language_for_analysis: boolean;

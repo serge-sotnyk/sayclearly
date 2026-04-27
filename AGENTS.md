@@ -12,6 +12,9 @@
 # Install dependencies
 uv sync
 
+# Wire the pre-commit hook (runs once per clone)
+uv run pre-commit install
+
 # Run the app locally
 uv run sayclearly
 
@@ -91,3 +94,4 @@ CLAUDE.md                        # Points Claude-compatible tools to AGENTS.md
 - The repository already includes the local app entry point and initial domain packages; keep new work aligned with the documented package layout above
 - Use the configured Context7 documentation workflow for current library/framework references; do not rely on undeclared local helper CLIs
 - Keep the MVP local-only: no remote backend, no shared key storage, no long-term audio retention by default
+- The frontend bundle in `src/sayclearly/static/dist/` is committed so `uvx --from git+...` keeps working without `npm` on the user's machine. A `pre-commit` hook (see `.pre-commit-config.yaml` and `scripts/check_frontend_bundle.py`) blocks commits where TypeScript sources changed but the bundle was not rebuilt; CI workflow `frontend-bundle.yml` is the backstop for clones that skipped `pre-commit install`

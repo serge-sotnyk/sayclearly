@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: frontend-bundle-fresh
+        name: Verify frontend bundle matches TypeScript sources
+        entry: uv run python scripts/check_frontend_bundle.py
+        language: system
+        files: ^(src/sayclearly/static/.*\.ts|tsconfig\.json|package\.json|package-lock\.json)$
+        pass_filenames: false

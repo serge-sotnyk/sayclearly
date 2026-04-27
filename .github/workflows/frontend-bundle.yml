@@ -1,0 +1,38 @@
+name: Frontend bundle freshness
+
+on:
+  pull_request:
+    paths:
+      - 'src/sayclearly/static/**'
+      - 'tsconfig.json'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches: [main]
+    paths:
+      - 'src/sayclearly/static/**'
+      - 'tsconfig.json'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  bundle-fresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build:frontend
+
+      - name: Verify bundle is up to date
+        run: |
+          if ! git diff --exit-code -- src/sayclearly/static/dist/; then
+            echo "::error::Frontend bundle is stale. Run 'npm run build:frontend' locally and commit the result in src/sayclearly/static/dist/."
+            exit 1
+          fi
