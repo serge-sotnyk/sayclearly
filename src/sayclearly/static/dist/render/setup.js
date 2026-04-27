@@ -4,7 +4,7 @@ function formatModelLabel(model) {
     if (model.free_tier_requests_per_day_hint === null) {
         return model.label;
     }
-    return `${model.label} (${model.free_tier_requests_per_day_hint} RPD hint)`;
+    return `${model.label} (${model.free_tier_requests_per_day_hint} RPD)`;
 }
 function renderModelOptions(documentRef, select, models) {
     const options = models.map((model) => {

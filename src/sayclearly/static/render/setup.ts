@@ -9,7 +9,7 @@ function formatModelLabel(model: PublicConfig['gemini']['available_models'][numb
     return model.label;
   }
 
-  return `${model.label} (${model.free_tier_requests_per_day_hint} RPD hint)`;
+  return `${model.label} (${model.free_tier_requests_per_day_hint} RPD)`;
 }
 
 function renderModelOptions(
