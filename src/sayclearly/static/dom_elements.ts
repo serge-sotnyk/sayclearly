@@ -7,9 +7,14 @@ export interface ShellElements {
   setupScreen: HTMLElement;
   exerciseScreen: HTMLElement;
   reviewActions: HTMLElement;
-  settingsPanel: HTMLElement;
+  settingsModal: HTMLElement;
+  settingsModalBackdrop: HTMLElement;
+  settingsModalCloseButton: HTMLButtonElement;
   openSettingsButton: HTMLButtonElement;
-  closeSettingsButton: HTMLButtonElement;
+  closeSettingsButtons: HTMLButtonElement[];
+  saveSettingsButton: HTMLButtonElement;
+  sessionLimitInput: HTMLInputElement;
+  clearHistoryButton: HTMLButtonElement;
   statusMessage: HTMLElement;
   settingsStatus: HTMLElement;
   clearApiKeyButton: HTMLButtonElement;
@@ -99,9 +104,14 @@ export function collectShellElements(root: RootLike): ShellElements {
     setupScreen: getRequiredElement(root, '[data-screen="setup"]'),
     exerciseScreen: getRequiredElement(root, '[data-screen="exercise"]'),
     reviewActions: getRequiredElement(root, '[data-review-actions]'),
-    settingsPanel: getRequiredElement(root, '[data-settings-panel]'),
+    settingsModal: getRequiredElement(root, '[data-settings-modal]'),
+    settingsModalBackdrop: getRequiredElement(root, '[data-settings-modal-backdrop]'),
+    settingsModalCloseButton: getRequiredElement(root, '[data-settings-modal-close]'),
     openSettingsButton: getRequiredElement(root, '[data-open-settings-button]'),
-    closeSettingsButton: getRequiredElement(root, '[data-close-settings-button]'),
+    closeSettingsButtons: Array.from(root.querySelectorAll('[data-close-settings-button]')),
+    saveSettingsButton: getRequiredElement(root, '[data-save-settings-button]'),
+    sessionLimitInput: getRequiredElement(root, '[data-session-limit-input]'),
+    clearHistoryButton: getRequiredElement(root, '[data-clear-history-button]'),
     statusMessage: getRequiredElement(root, '[data-status-message]'),
     settingsStatus: getRequiredElement(root, '[data-settings-status]'),
     clearApiKeyButton: getRequiredElement(root, '[data-clear-api-key-button]'),

@@ -37,9 +37,41 @@ select {
 }
 
 .page-shell {
+    position: relative;
     width: min(72rem, calc(100% - 2rem));
     margin: 0 auto;
     padding: 2rem 0 3rem;
+}
+
+.settings-icon-button {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 1px solid rgba(82, 96, 109, 0.2);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    color: #52606d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.settings-icon-button:hover,
+.settings-icon-button:focus-visible {
+    background: rgba(255, 244, 224, 0.95);
+    border-color: rgba(124, 92, 43, 0.45);
+    color: #1f2933;
+    outline: none;
+}
+
+.settings-icon-glyph {
+    display: block;
 }
 
 .panel {
@@ -52,8 +84,7 @@ select {
 
 .hero-panel,
 .status-banner,
-.screen-panel,
-.settings-panel {
+.screen-panel {
     padding: 1.5rem;
 }
 
@@ -71,19 +102,15 @@ select {
 
 .shell-grid {
     display: flex;
+    flex-direction: column;
     gap: 1rem;
-    align-items: flex-start;
+    align-items: stretch;
 }
 
 .screen-panel {
     flex: 1 1 auto;
     min-width: 0;
     width: 100%;
-}
-
-.settings-panel {
-    flex: 0 0 16rem;
-    min-width: 16rem;
 }
 
 .panel-heading {
@@ -104,9 +131,14 @@ select {
 
 .status-label,
 .status-text,
-.step-instruction,
-.settings-status {
+.step-instruction {
     margin: 0;
+}
+
+.settings-status {
+    margin: 0.4rem 0 0;
+    font-size: 0.88rem;
+    color: #52606d;
 }
 
 h1,
@@ -128,8 +160,7 @@ h2 {
     color: #52606d;
 }
 
-.setup-form,
-.settings-actions {
+.setup-form {
     display: grid;
     gap: 1rem;
 }
@@ -189,8 +220,7 @@ input[type="checkbox"] {
     color: #334e68;
 }
 
-.button-row,
-.settings-actions {
+.button-row {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
@@ -410,16 +440,6 @@ audio[data-recording-preview] {
 }
 
 @media (max-width: 960px) {
-    .shell-grid {
-        flex-direction: column;
-    }
-
-    .settings-panel {
-        flex: 1 1 auto;
-        min-width: auto;
-        width: 100%;
-    }
-
     .history-header,
     .history-layout {
         flex-direction: column;
@@ -434,14 +454,12 @@ audio[data-recording-preview] {
 
     .hero-panel,
     .status-banner,
-    .screen-panel,
-    .settings-panel {
+    .screen-panel {
         padding: 1.25rem;
     }
 
     .status-banner,
-    .button-row,
-    .settings-actions {
+    .button-row {
         flex-direction: column;
         align-items: stretch;
     }
@@ -664,5 +682,102 @@ audio[data-recording-preview] {
 
 body.is-modal-open {
     overflow: hidden;
+}
+
+.settings-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+}
+
+.settings-modal[hidden] {
+    display: none !important;
+}
+
+.settings-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 24, 33, 0.45);
+    backdrop-filter: blur(2px);
+}
+
+.settings-modal-dialog {
+    position: relative;
+    width: min(640px, 92vw);
+    max-height: 85vh;
+    overflow-y: auto;
+    background: #fdfaf3;
+    border-radius: 1.1rem;
+    box-shadow: 0 20px 60px rgba(20, 24, 33, 0.35);
+    padding: 1.25rem 1.4rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.settings-modal-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.settings-modal-heading h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.settings-modal-heading .button-ghost {
+    font-size: 1.4rem;
+    line-height: 1;
+    padding: 0.2rem 0.55rem;
+    min-height: auto;
+}
+
+.settings-modal-section {
+    display: grid;
+    gap: 0.6rem;
+    padding: 1rem;
+    border: 1px solid rgba(124, 92, 43, 0.16);
+    border-radius: 1rem;
+    background: rgba(252, 249, 243, 0.92);
+}
+
+.settings-modal-section .field {
+    margin: 0;
+}
+
+.settings-section-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 0.2rem;
+}
+
+.settings-modal-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(82, 96, 109, 0.18);
+}
+
+@media (max-width: 640px) {
+    .settings-modal {
+        padding: 0.75rem;
+    }
+
+    .settings-modal-actions {
+        justify-content: stretch;
+    }
+
+    .settings-modal-actions .button {
+        width: 100%;
+    }
 }
 

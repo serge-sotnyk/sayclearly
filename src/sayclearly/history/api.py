@@ -37,4 +37,11 @@ def build_history_router(data_root: Path | None = None) -> APIRouter:
         except StorageError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    @router.delete("/api/history", response_model=HistoryStore)
+    def clear_history() -> HistoryStore:
+        try:
+            return service.clear_history()
+        except StorageError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     return router

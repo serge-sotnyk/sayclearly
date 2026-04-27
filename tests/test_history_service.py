@@ -75,9 +75,7 @@ def test_save_session_trims_to_configured_limit(tmp_path: Path) -> None:
     assert reloaded_history.sessions == [make_session("02")]
 
 
-def test_save_session_serializes_concurrent_writes_in_process(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_save_session_serializes_concurrent_writes_in_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     service = HistoryService(tmp_path)
     load_config(tmp_path)
     load_history(tmp_path)
@@ -151,9 +149,7 @@ def _topic_session(
 def test_recent_topic_entries_returns_unique_topics_newest_first(tmp_path: Path) -> None:
     service = HistoryService(tmp_path)
     service.save_session(_topic_session("01", topic="rust facts", second=1))
-    service.save_session(
-        _topic_session("02", topic="ordering coffee", language="English", second=2)
-    )
+    service.save_session(_topic_session("02", topic="ordering coffee", language="English", second=2))
     service.save_session(_topic_session("03", topic="RUST FACTS", second=3))
 
     entries = service.recent_topic_entries()
@@ -208,3 +204,45 @@ def test_recent_topic_entries_returns_empty_for_zero_or_negative_limit(tmp_path:
 
     assert service.recent_topic_entries(limit=0) == []
     assert service.recent_topic_entries(limit=-1) == []
+
+
+def test_clear_history_empties_storage(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    service.save_session(make_session("01"))
+    service.save_session(make_session("02"))
+
+    cleared = service.clear_history()
+    reloaded_history = load_history(tmp_path)
+
+    assert cleared.sessions == []
+    assert reloaded_history.sessions == []
+
+
+def test_clear_history_is_idempotent_when_already_empty(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+
+    cleared = service.clear_history()
+
+    assert cleared.sessions == []
+
+
+def test_enforce_limit_truncates_to_new_limit(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    service.save_session(make_session("01"))
+    service.save_session(make_session("02"))
+    service.save_session(make_session("03"))
+
+    trimmed = service.enforce_limit(2)
+    reloaded_history = load_history(tmp_path)
+
+    assert [session.id for session in trimmed.sessions] == ["03", "02"]
+    assert [session.id for session in reloaded_history.sessions] == ["03", "02"]
+
+
+def test_enforce_limit_is_noop_when_history_already_smaller(tmp_path: Path) -> None:
+    service = HistoryService(tmp_path)
+    service.save_session(make_session("01"))
+
+    result = service.enforce_limit(50)
+
+    assert [session.id for session in result.sessions] == ["01"]

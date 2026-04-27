@@ -9,14 +9,34 @@
   </head>
   <body>
     <main class="page-shell" data-app-root>
+      <button
+        type="button"
+        class="settings-icon-button"
+        data-open-settings-button
+        aria-label="Open settings"
+        title="Settings"
+      >
+        <svg
+          class="settings-icon-glyph"
+          viewBox="0 0 24 24"
+          width="22"
+          height="22"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.31.69.86 1.21 1.51 1.34H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+          />
+        </svg>
+      </button>
       <section class="hero-panel panel">
-        <div class="button-row">
-          <div>
-            <p class="eyebrow">Guided exercise flow</p>
-            <h1>SayClearly</h1>
-          </div>
-          <button type="button" class="button button-ghost" data-open-settings-button>Settings</button>
-        </div>
+        <p class="eyebrow">Guided exercise flow</p>
+        <h1>SayClearly</h1>
         <p class="lead">
           Prepare a topic, move through each speaking step, and keep the session setup close at hand.
         </p>
@@ -35,29 +55,6 @@
           </div>
 
           <form class="setup-form">
-            <label class="field">
-              <span class="label-with-popover">
-                Gemini API key
-                <span class="info-popover" data-api-key-popover>
-                  <button
-                    type="button"
-                    class="info-popover-trigger"
-                    aria-label="About the API key and local-only operation"
-                    aria-expanded="false"
-                    data-info-popover-toggle
-                  >?</button>
-                  <span class="info-popover-body" role="tooltip" data-info-popover-body>
-                    <span data-local-storage-note>
-                      Runs fully locally on your machine. Bring your own Gemini API key.
-                    </span>
-                    <span>Recordings are temporary and are deleted after each analysis attempt.</span>
-                  </span>
-                </span>
-              </span>
-              <input type="password" name="api-key" autocomplete="off" placeholder="Paste your local API key" data-api-key-input />
-            </label>
-            <p class="field-hint" data-api-key-hint>Paste a key here or use .env for local development.</p>
-
             <label class="field">
               <span>Text generation model</span>
               <select name="text-model" data-text-model-select></select>
@@ -276,22 +273,110 @@
           </div>
         </section>
 
-        <aside class="panel settings-panel" data-settings-panel aria-labelledby="settings-title">
-          <div class="panel-heading">
-            <p class="section-kicker">Settings</p>
-            <h2 id="settings-title">Local key storage</h2>
+      </div>
+      <div
+        class="settings-modal"
+        data-settings-modal
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-modal-title"
+      >
+        <div class="settings-modal-backdrop" data-settings-modal-backdrop></div>
+        <div class="settings-modal-dialog">
+          <div class="settings-modal-heading">
+            <h2 id="settings-modal-title">Settings</h2>
+            <button
+              type="button"
+              class="button button-ghost"
+              data-settings-modal-close
+              aria-label="Close settings"
+            >×</button>
           </div>
 
-          <p class="settings-status" data-settings-status>API key status: not checked yet.</p>
-          <p class="field-hint" data-telemetry-note>
-            Optional telemetry stays off unless Langfuse is configured.
-          </p>
+          <section class="settings-modal-section">
+            <p class="section-kicker">API key</p>
+            <label class="field">
+              <span class="label-with-popover">
+                Gemini API key
+                <span class="info-popover" data-api-key-popover>
+                  <button
+                    type="button"
+                    class="info-popover-trigger"
+                    aria-label="About the API key and local-only operation"
+                    aria-expanded="false"
+                    data-info-popover-toggle
+                  >?</button>
+                  <span class="info-popover-body" role="tooltip" data-info-popover-body>
+                    <span data-local-storage-note>
+                      Runs fully locally on your machine. Bring your own Gemini API key.
+                    </span>
+                    <span>Recordings are temporary and are deleted after each analysis attempt.</span>
+                  </span>
+                </span>
+              </span>
+              <input
+                type="password"
+                name="api-key"
+                autocomplete="off"
+                placeholder="Paste your local API key"
+                data-api-key-input
+              />
+            </label>
+            <p class="field-hint" data-api-key-hint>Paste a key here or use .env for local development.</p>
+            <p class="settings-status" data-settings-status>API key status: not checked yet.</p>
+            <div class="settings-section-actions">
+              <button
+                type="button"
+                class="button button-secondary"
+                data-clear-api-key-button
+              >Clear stored API key</button>
+            </div>
+          </section>
 
-          <div class="settings-actions">
-            <button type="button" class="button button-secondary" data-clear-api-key-button>Clear stored API key</button>
-            <button type="button" class="button button-ghost" data-close-settings-button>Close settings</button>
+          <section class="settings-modal-section">
+            <p class="section-kicker">History</p>
+            <label class="field">
+              <span>Session limit</span>
+              <input
+                type="number"
+                min="1"
+                max="1000"
+                step="1"
+                name="session-limit"
+                data-session-limit-input
+              />
+            </label>
+            <p class="field-hint">Older sessions are removed automatically beyond this limit.</p>
+            <div class="settings-section-actions">
+              <button
+                type="button"
+                class="button button-secondary"
+                data-clear-history-button
+              >Clear all history</button>
+            </div>
+          </section>
+
+          <section class="settings-modal-section">
+            <p class="section-kicker">Telemetry</p>
+            <p class="field-hint" data-telemetry-note>
+              Optional telemetry stays off unless Langfuse is configured.
+            </p>
+          </section>
+
+          <div class="settings-modal-actions">
+            <button
+              type="button"
+              class="button button-primary"
+              data-save-settings-button
+            >Save settings</button>
+            <button
+              type="button"
+              class="button button-ghost"
+              data-close-settings-button
+            >Close</button>
           </div>
-        </aside>
+        </div>
       </div>
       <div
         class="history-modal"

@@ -4,17 +4,6 @@ import { GENERATING_STATUS } from '../render/index.js';
 import { readSettings } from './settings.js';
 const LOAD_ERROR_STATUS = 'Could not load your saved settings. You can still enter them manually.';
 const GENERATE_ERROR_STATUS = 'Could not generate a guided exercise. Check your settings and try again.';
-function buildConfigRequest(config, settings, apiKeyValue) {
-    const nextConfig = buildConfigUpdatePayload(config, settings);
-    const trimmedApiKey = apiKeyValue.trim();
-    return {
-        ...nextConfig,
-        gemini: {
-            ...nextConfig.gemini,
-            api_key: trimmedApiKey === '' ? null : trimmedApiKey,
-        },
-    };
-}
 export function createExerciseFeature(ctx) {
     const { elements, fetchImpl, state } = ctx;
     const stopGenerationTicker = () => {
@@ -71,7 +60,7 @@ export function createExerciseFeature(ctx) {
                     throw new RequestError('Request failed: /api/config', getRequestErrorMessage(error, LOAD_ERROR_STATUS));
                 }
             }
-            const savedConfig = await saveConfig(fetchImpl, buildConfigRequest(configForSave, settings, elements.apiKeyInput.value), controller.signal);
+            const savedConfig = await saveConfig(fetchImpl, buildConfigUpdatePayload(configForSave, settings), controller.signal);
             state.hasLoadedConfig = true;
             state.model = {
                 ...state.model,

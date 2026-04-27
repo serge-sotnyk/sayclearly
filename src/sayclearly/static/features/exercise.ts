@@ -14,9 +14,6 @@ import {
   buildConfigUpdatePayload,
   buildGenerateRequest,
   startGeneration,
-  type ConfigUpdatePayload,
-  type PublicConfig,
-  type SettingsFormState,
 } from '../app_state.js';
 import { type AppContext } from '../app_context.js';
 import { GENERATING_STATUS } from '../render/index.js';
@@ -26,23 +23,6 @@ const LOAD_ERROR_STATUS =
   'Could not load your saved settings. You can still enter them manually.';
 const GENERATE_ERROR_STATUS =
   'Could not generate a guided exercise. Check your settings and try again.';
-
-function buildConfigRequest(
-  config: PublicConfig,
-  settings: SettingsFormState,
-  apiKeyValue: string,
-): ConfigUpdatePayload {
-  const nextConfig = buildConfigUpdatePayload(config, settings);
-  const trimmedApiKey = apiKeyValue.trim();
-
-  return {
-    ...nextConfig,
-    gemini: {
-      ...nextConfig.gemini,
-      api_key: trimmedApiKey === '' ? null : trimmedApiKey,
-    },
-  };
-}
 
 export interface ExerciseFeature {
   attachHandlers(): void;
@@ -115,7 +95,7 @@ export function createExerciseFeature(ctx: AppContext): ExerciseFeature {
 
       const savedConfig = await saveConfig(
         fetchImpl,
-        buildConfigRequest(configForSave, settings, elements.apiKeyInput.value),
+        buildConfigUpdatePayload(configForSave, settings),
         controller.signal,
       );
       state.hasLoadedConfig = true;

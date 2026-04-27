@@ -131,5 +131,5 @@ export function renderSetup(
   elements.localStorageNote.textContent = getLocalStorageNote(model.config);
   elements.telemetryNote.textContent = getTelemetryNote(model.config);
   elements.statusMessage.textContent = getStatusMessage(model, transientBannerMessage);
-  elements.settingsPanel.hidden = !isSettingsOpen;
+  elements.settingsModal.hidden = !isSettingsOpen;
 }

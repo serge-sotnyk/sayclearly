@@ -17,7 +17,9 @@ def test_home_page_renders_stage_3_shell() -> None:
     assert "data-app-root" in response.text
     assert 'data-screen="setup"' in response.text
     assert 'data-screen="exercise"' in response.text
-    assert "data-settings-panel" in response.text
+    assert "data-settings-modal" in response.text
+    assert "data-settings-modal-backdrop" in response.text
+    assert "data-settings-modal-close" in response.text
     assert "data-status-message" in response.text
     assert "data-open-settings-button" in response.text
     assert "data-api-key-input" in response.text
@@ -35,6 +37,9 @@ def test_home_page_renders_stage_3_shell() -> None:
     assert "data-next-step-button" in response.text
     assert "data-settings-status" in response.text
     assert "data-clear-api-key-button" in response.text
+    assert "data-clear-history-button" in response.text
+    assert "data-session-limit-input" in response.text
+    assert "data-save-settings-button" in response.text
     assert "data-close-settings-button" in response.text
     assert "/static/dist/app.js" in response.text
 
@@ -225,4 +230,20 @@ def test_history_modal_lives_inside_app_root_so_collect_shell_elements_can_find_
         "collectShellElements (which scopes its querySelector calls to the app root) "
         "can locate it on startup. If it sits outside <main>, the JS bootstrap "
         "throws and the setup/exercise/settings panels render uncontrolled."
+    )
+
+
+def test_settings_modal_lives_inside_app_root() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    body = response.text
+    main_open = body.index("<main")
+    main_close = body.index("</main>")
+    modal_marker = body.index("data-settings-modal")
+    assert main_open < modal_marker < main_close, (
+        "Settings modal must be a descendant of <main data-app-root> so that "
+        "collectShellElements can locate it on startup."
     )

@@ -40,12 +40,26 @@ class HistoryService:
             history = load_history(self.data_root)
             config = load_config(self.data_root)
 
-            remaining_sessions = [
-                existing for existing in history.sessions if existing.id != session.id
-            ]
+            remaining_sessions = [existing for existing in history.sessions if existing.id != session.id]
             remaining_sessions.insert(0, session)
             history.sessions = remaining_sessions[: config.session_limit]
 
+            save_history(self.data_root, history)
+            return history
+
+    def clear_history(self) -> HistoryStore:
+        with _SAVE_SESSION_LOCK:
+            history = load_history(self.data_root)
+            history.sessions = []
+            save_history(self.data_root, history)
+            return history
+
+    def enforce_limit(self, limit: int) -> HistoryStore:
+        with _SAVE_SESSION_LOCK:
+            history = load_history(self.data_root)
+            if len(history.sessions) <= limit:
+                return history
+            history.sessions = history.sessions[:limit]
             save_history(self.data_root, history)
             return history
 

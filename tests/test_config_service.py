@@ -259,9 +259,7 @@ def test_get_public_config_enables_langfuse_when_base_url_env_is_used(
     assert public.langfuse.host == "https://env-langfuse.example"
 
 
-def test_get_public_config_uses_env_defaults_when_storage_is_missing(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_get_public_config_uses_env_defaults_when_storage_is_missing(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite-preview")
 
     public = ConfigService(tmp_path).get_public_config()
@@ -301,18 +299,14 @@ def test_update_config_persists_public_and_secret_values_in_separate_files(tmp_p
     public = service.update_config(make_payload())
 
     assert public.session_limit == 123
-    assert (
-        json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["session_limit"] == 123
-    )
+    assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["session_limit"] == 123
     assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["gemini"] == {
         "text_model": "gemini-3-flash-preview",
         "analysis_model": "gemini-3.1-flash-lite-preview",
         "same_model_for_analysis": False,
         "text_thinking_level": "medium",
     }
-    assert json.loads((tmp_path / "secrets.json").read_text(encoding="utf-8"))["gemini"] == {
-        "api_key": "stored-gemini"
-    }
+    assert json.loads((tmp_path / "secrets.json").read_text(encoding="utf-8"))["gemini"] == {"api_key": "stored-gemini"}
 
 
 def test_update_config_keeps_existing_secrets_when_null_fields_are_sent(tmp_path: Path) -> None:
@@ -434,3 +428,55 @@ def test_whitespace_only_environment_override_does_not_mask_stored_values(
     assert public.gemini.api_key_source == "stored"
     assert public.langfuse.host == "https://langfuse.example"
     assert public.langfuse.enabled is False
+
+
+def test_lowering_session_limit_truncates_existing_history(tmp_path: Path) -> None:
+    from sayclearly.history.service import HistoryService
+    from sayclearly.storage.models import HistorySession, SessionAnalysis
+
+    config_service = ConfigService(tmp_path)
+    config_service.update_config(make_payload(session_limit=50))
+
+    history_service = HistoryService(tmp_path)
+    for index in range(5):
+        history_service.save_session(
+            HistorySession(
+                id=f"{index:02d}",
+                created_at=f"2026-04-20T10:00:{index:02d}",
+                language="uk",
+                topic_prompt="topic",
+                text=f"Generated text {index}",
+                analysis=SessionAnalysis(clarity_score=7, pace_score=6, summary=["ok"]),
+            )
+        )
+
+    config_service.update_config(make_payload(session_limit=2))
+
+    remaining = history_service.list_history()
+    assert [session.id for session in remaining.sessions] == ["04", "03"]
+
+
+def test_raising_session_limit_does_not_modify_history(tmp_path: Path) -> None:
+    from sayclearly.history.service import HistoryService
+    from sayclearly.storage.models import HistorySession, SessionAnalysis
+
+    config_service = ConfigService(tmp_path)
+    config_service.update_config(make_payload(session_limit=2))
+
+    history_service = HistoryService(tmp_path)
+    for index in range(2):
+        history_service.save_session(
+            HistorySession(
+                id=f"{index:02d}",
+                created_at=f"2026-04-20T10:00:{index:02d}",
+                language="uk",
+                topic_prompt="topic",
+                text=f"Generated text {index}",
+                analysis=SessionAnalysis(clarity_score=7, pace_score=6, summary=["ok"]),
+            )
+        )
+
+    config_service.update_config(make_payload(session_limit=10))
+
+    remaining = history_service.list_history()
+    assert [session.id for session in remaining.sessions] == ["01", "00"]

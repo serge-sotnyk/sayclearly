@@ -154,3 +154,9 @@ export async function saveHistorySession(
     body: JSON.stringify(session),
   });
 }
+
+export async function clearHistory(fetchImpl: typeof fetch): Promise<HistoryStore> {
+  return await requestJson<HistoryStore>(fetchImpl, ENDPOINTS.history, {
+    method: 'DELETE',
+  });
+}

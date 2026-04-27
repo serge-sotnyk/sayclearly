@@ -18,6 +18,7 @@ from sayclearly.gemini.catalog import (
     sanitize_analysis_model,
     sanitize_text_model,
 )
+from sayclearly.history.service import HistoryService
 from sayclearly.storage.files import load_config, load_secrets, save_config, save_secrets
 
 
@@ -41,9 +42,7 @@ class ConfigService:
         stored_config = load_config(self.data_root)
         stored_secrets = load_secrets(self.data_root)
         effective_text_model = self._resolve_effective_text_model(stored_config.gemini.text_model)
-        effective_analysis_model = self._resolve_effective_analysis_model(
-            stored_config.gemini.analysis_model
-        )
+        effective_analysis_model = self._resolve_effective_analysis_model(stored_config.gemini.analysis_model)
 
         gemini_api_key, gemini_source = self._resolve_secret(
             env_name="GEMINI_API_KEY",
@@ -116,6 +115,10 @@ class ConfigService:
         except Exception:
             save_config(self.data_root, previous_config)
             raise
+
+        if payload.session_limit < previous_config.session_limit:
+            HistoryService(self.data_root).enforce_limit(payload.session_limit)
+
         return self.get_public_config()
 
     def clear_stored_gemini_api_key(self) -> PublicConfigView:

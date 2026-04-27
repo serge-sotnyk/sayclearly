@@ -246,7 +246,12 @@ function createShell({ recentTopics = null } = {}) {
     ['[data-screen="setup"]', new FakeElement()],
     ['[data-screen="exercise"]', new FakeElement()],
     ['[data-screen="history"]', new FakeElement({ hidden: true })],
-    ['[data-settings-panel]', new FakeElement({ hidden: true })],
+    ['[data-settings-modal]', new FakeElement({ hidden: true })],
+    ['[data-settings-modal-backdrop]', new FakeElement()],
+    ['[data-settings-modal-close]', new FakeElement()],
+    ['[data-save-settings-button]', new FakeElement()],
+    ['[data-session-limit-input]', new FakeElement({ value: '10' })],
+    ['[data-clear-history-button]', new FakeElement()],
     ['[data-api-key-input]', new FakeElement()],
     ['[data-api-key-hint]', new FakeElement()],
     ['[data-text-model-select]', new FakeElement()],
@@ -316,14 +321,21 @@ function createShell({ recentTopics = null } = {}) {
     ['[data-history-detail-reuse-topic-button]', new FakeElement({ disabled: true })],
     ['[data-settings-status]', new FakeElement()],
     ['[data-clear-api-key-button]', new FakeElement()],
-    ['[data-close-settings-button]', new FakeElement()],
     ['[data-local-storage-note]', new FakeElement()],
     ['[data-telemetry-note]', new FakeElement()],
   ]);
 
+  const closeSettingsHeaderButton = new FakeElement();
+  const closeSettingsFooterButton = new FakeElement();
   const root = new FakeRoot(
     elements,
-    new Map([['[data-new-session-button]', [reviewNewSessionButton, historyNewSessionButton]]]),
+    new Map([
+      ['[data-new-session-button]', [reviewNewSessionButton, historyNewSessionButton]],
+      [
+        '[data-close-settings-button]',
+        [closeSettingsHeaderButton, closeSettingsFooterButton],
+      ],
+    ]),
   );
   const documentListeners = new Map();
   const recentTopicsNode =
@@ -444,14 +456,14 @@ test('startApp loads config, renders the shell, and keeps languages synced while
   assert.equal(shell.elements.get('[data-thinking-level-select]').value, 'medium');
   assert.equal(shell.elements.get('[data-topic-input]').value, '');
   assert.match(shell.elements.get('[data-settings-status]').textContent, /stored/i);
-  assert.equal(shell.elements.get('[data-settings-panel]').hidden, true);
+  assert.equal(shell.elements.get('[data-settings-modal]').hidden, true);
   assert.deepEqual(
     shell.elements.get('[data-text-model-select]').children.map((option) => option.textContent),
     ['Gemini 3 Flash', 'Gemini 2.5 Flash (250 RPD hint)'],
   );
 
   await shell.elements.get('[data-open-settings-button]').click();
-  assert.equal(shell.elements.get('[data-settings-panel]').hidden, false);
+  assert.equal(shell.elements.get('[data-settings-modal]').hidden, false);
 
   shell.elements.get('[data-text-language-input]').value = 'pl';
   await shell.elements.get('[data-text-language-input]').input();
@@ -463,8 +475,8 @@ test('startApp loads config, renders the shell, and keeps languages synced while
   await shell.elements.get('[data-text-language-input]').input();
   assert.equal(shell.elements.get('[data-analysis-language-input]').value, 'pl');
 
-  await shell.elements.get('[data-close-settings-button]').click();
-  assert.equal(shell.elements.get('[data-settings-panel]').hidden, true);
+  await shell.root.collections.get('[data-close-settings-button]')[1].click();
+  assert.equal(shell.elements.get('[data-settings-modal]').hidden, true);
 });
 
 test('startApp shows when the Gemini API key comes from .env', async () => {
@@ -1346,4 +1358,143 @@ test('recording timer ticks while a recording is in progress', async (t) => {
   // Stopping the recorder must clear the visible timer.
   await shell.elements.get('[data-stop-recording-button]').click();
   assert.equal(timer.textContent, '');
+});
+
+function withConfirmStub(stub, body) {
+  const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'confirm');
+  Object.defineProperty(globalThis, 'confirm', {
+    configurable: true,
+    writable: true,
+    value: stub,
+  });
+  return Promise.resolve()
+    .then(body)
+    .finally(() => {
+      if (previousDescriptor) {
+        Object.defineProperty(globalThis, 'confirm', previousDescriptor);
+      } else {
+        delete globalThis.confirm;
+      }
+    });
+}
+
+test('saving settings posts the typed API key, new session_limit, and closes the modal', async () => {
+  await withConfirmStub(
+    () => true,
+    async () => {
+      const shell = createShell();
+      const initialConfig = createConfig({ session_limit: 10 });
+      const savedConfig = createConfig({ session_limit: 25 });
+      const { fetchStub, calls } = createFetchStub(
+        createResponse(initialConfig),
+        createResponse(savedConfig),
+      );
+
+      await startApp(shell.document, fetchStub);
+      await shell.elements.get('[data-open-settings-button]').click();
+
+      shell.elements.get('[data-api-key-input]').value = 'fresh-key';
+      shell.elements.get('[data-session-limit-input]').value = '25';
+      await shell.elements.get('[data-save-settings-button]').click();
+
+      const saveCall = calls.find((call) => call.options?.method === 'POST');
+      assert.ok(saveCall);
+      const body = JSON.parse(saveCall.options.body);
+      assert.equal(body.session_limit, 25);
+      assert.equal(body.gemini.api_key, 'fresh-key');
+      assert.equal(shell.elements.get('[data-settings-modal]').hidden, true);
+      assert.equal(shell.elements.get('[data-api-key-input]').value, '');
+    },
+  );
+});
+
+test('save aborts when shrinking session_limit and the user cancels the confirm', async () => {
+  let confirmCalls = 0;
+  await withConfirmStub(
+    () => {
+      confirmCalls += 1;
+      return false;
+    },
+    async () => {
+      const shell = createShell();
+      const initialConfig = createConfig({ session_limit: 50 });
+      const historyStore = createHistoryStore([
+        { id: 'a', topic_prompt: 'a', text: 'a', language: 'en', analysis_language: 'en', created_at: '2026-04-20T10:00:00' },
+        { id: 'b', topic_prompt: 'b', text: 'b', language: 'en', analysis_language: 'en', created_at: '2026-04-20T10:00:01' },
+        { id: 'c', topic_prompt: 'c', text: 'c', language: 'en', analysis_language: 'en', created_at: '2026-04-20T10:00:02' },
+      ]);
+      const { fetchStub, calls } = createFetchStub(
+        createResponse(initialConfig),
+        createResponse(historyStore),
+      );
+
+      await startApp(shell.document, fetchStub);
+      await shell.elements.get('[data-open-settings-button]').click();
+      shell.elements.get('[data-session-limit-input]').value = '1';
+      await shell.elements.get('[data-save-settings-button]').click();
+
+      assert.equal(confirmCalls, 1);
+      // Only GET /api/config and GET /api/history must have been called — no POST.
+      assert.deepEqual(
+        calls.map((call) => ({ url: call.url, method: call.options.method ?? 'GET' })),
+        [
+          { url: '/api/config', method: 'GET' },
+          { url: '/api/history', method: 'GET' },
+        ],
+      );
+      // Modal stays open.
+      assert.equal(shell.elements.get('[data-settings-modal]').hidden, false);
+    },
+  );
+});
+
+test('clear all history calls DELETE /api/history after the user confirms', async () => {
+  let confirmCalls = 0;
+  await withConfirmStub(
+    () => {
+      confirmCalls += 1;
+      return true;
+    },
+    async () => {
+      const shell = createShell({
+        recentTopics: [
+          { topic: 'old topic', text_language: 'en', analysis_language: 'en' },
+        ],
+      });
+      const initialConfig = createConfig();
+      const emptyHistory = createHistoryStore([]);
+      const { fetchStub, calls } = createFetchStub(
+        createResponse(initialConfig),
+        createResponse(emptyHistory),
+      );
+
+      await startApp(shell.document, fetchStub);
+      await shell.elements.get('[data-open-settings-button]').click();
+      await shell.elements.get('[data-clear-history-button]').click();
+
+      assert.equal(confirmCalls, 1);
+      const deleteCall = calls.find((call) => call.options?.method === 'DELETE');
+      assert.ok(deleteCall);
+      assert.equal(deleteCall.url, '/api/history');
+    },
+  );
+});
+
+test('Esc and backdrop click close the settings modal', async () => {
+  const shell = createShell();
+  const config = createConfig();
+  const { fetchStub } = createFetchStub(createResponse(config));
+
+  await startApp(shell.document, fetchStub);
+  await shell.elements.get('[data-open-settings-button]').click();
+  assert.equal(shell.elements.get('[data-settings-modal]').hidden, false);
+
+  shell.dispatchDocumentEvent('keydown', { key: 'Escape' });
+  assert.equal(shell.elements.get('[data-settings-modal]').hidden, true);
+
+  await shell.elements.get('[data-open-settings-button]').click();
+  assert.equal(shell.elements.get('[data-settings-modal]').hidden, false);
+
+  await shell.elements.get('[data-settings-modal-backdrop]').click();
+  assert.equal(shell.elements.get('[data-settings-modal]').hidden, true);
 });

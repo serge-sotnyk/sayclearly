@@ -81,3 +81,25 @@ def test_post_history_returns_422_for_semantically_invalid_payload(tmp_path: Pat
     response = client.post("/api/history", json=session)
 
     assert response.status_code == 422
+
+
+def test_delete_history_clears_all_sessions(tmp_path: Path) -> None:
+    client = TestClient(create_app(tmp_path))
+    client.post("/api/history", json=make_session("01"))
+    client.post("/api/history", json=make_session("02"))
+
+    response = client.delete("/api/history")
+    listing = client.get("/api/history")
+
+    assert response.status_code == 200
+    assert response.json()["sessions"] == []
+    assert listing.json()["sessions"] == []
+
+
+def test_delete_history_is_safe_when_already_empty(tmp_path: Path) -> None:
+    client = TestClient(create_app(tmp_path))
+
+    response = client.delete("/api/history")
+
+    assert response.status_code == 200
+    assert response.json() == {"version": 1, "sessions": []}

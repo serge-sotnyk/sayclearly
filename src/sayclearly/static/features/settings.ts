@@ -1,15 +1,25 @@
-import { deleteApiKey } from '../api_client.js';
+import { clearHistory, deleteApiKey, loadHistory, saveConfig } from '../api_client.js';
 import {
   applyLoadedConfig,
+  buildConfigUpdatePayload,
   createInitialAppModel,
   syncAnalysisLanguage,
   syncAnalysisModel,
+  type ConfigUpdatePayload,
   type SettingsFormState,
 } from '../app_state.js';
 import { type AppContext } from '../app_context.js';
 import { type ShellElements } from '../dom_elements.js';
 
-const CLEAR_ERROR_STATUS = 'Could not clear the stored API key. Try again.';
+const CLEAR_KEY_ERROR_STATUS = 'Could not clear the stored API key. Try again.';
+const CLEAR_HISTORY_ERROR_STATUS = 'Could not clear history. Try again.';
+const SAVE_ERROR_STATUS = 'Could not save settings. Try again.';
+const HISTORY_COUNT_ERROR_STATUS =
+  'Could not check the current history size. Try again.';
+
+const CLEAR_KEY_CONFIRM = 'Clear the stored Gemini API key on this machine?';
+const CLEAR_HISTORY_CONFIRM =
+  'Permanently delete all saved sessions from local history?';
 
 export function readSettings(elements: ShellElements): SettingsFormState {
   return syncAnalysisModel(
@@ -29,6 +39,8 @@ export function readSettings(elements: ShellElements): SettingsFormState {
 
 export interface SettingsFeature {
   attachHandlers(): void;
+  openModal(): void;
+  closeModal(): void;
 }
 
 export function createSettingsFeature(ctx: AppContext): SettingsFeature {
@@ -46,7 +58,27 @@ export function createSettingsFeature(ctx: AppContext): SettingsFeature {
     updateSettings(readSettings(elements));
   };
 
+  const openModal = (): void => {
+    state.isSettingsOpen = true;
+    elements.apiKeyInput.value = '';
+    elements.sessionLimitInput.value = String(state.model.config.session_limit);
+    documentRef.body?.classList.add('is-modal-open');
+    ctx.rerender();
+  };
+
+  const closeModal = (): void => {
+    if (!state.isSettingsOpen) {
+      return;
+    }
+    state.isSettingsOpen = false;
+    documentRef.body?.classList.remove('is-modal-open');
+    ctx.rerender();
+  };
+
   const handleClearApiKey = async (): Promise<void> => {
+    if (!confirmAction(CLEAR_KEY_CONFIRM)) {
+      return;
+    }
     try {
       const config = await deleteApiKey(fetchImpl);
       state.model = {
@@ -58,7 +90,85 @@ export function createSettingsFeature(ctx: AppContext): SettingsFeature {
       elements.apiKeyInput.value = '';
       ctx.rerender();
     } catch {
-      elements.settingsStatus.textContent = CLEAR_ERROR_STATUS;
+      elements.settingsStatus.textContent = CLEAR_KEY_ERROR_STATUS;
+    }
+  };
+
+  const handleClearHistory = async (): Promise<void> => {
+    if (!confirmAction(CLEAR_HISTORY_CONFIRM)) {
+      return;
+    }
+    try {
+      await clearHistory(fetchImpl);
+      state.recentTopics = [];
+      state.model = {
+        ...state.model,
+        history_sessions: state.model.history_sessions === null ? null : [],
+        selected_history_session: null,
+        history_error: null,
+      };
+      ctx.rerender();
+    } catch {
+      elements.settingsStatus.textContent = CLEAR_HISTORY_ERROR_STATUS;
+    }
+  };
+
+  const buildSavePayload = (newSessionLimit: number, apiKey: string): ConfigUpdatePayload => {
+    const base = buildConfigUpdatePayload(state.model.config, state.model.settings);
+    const trimmedApiKey = apiKey.trim();
+    return {
+      ...base,
+      session_limit: newSessionLimit,
+      gemini: {
+        ...base.gemini,
+        api_key: trimmedApiKey === '' ? null : trimmedApiKey,
+      },
+    };
+  };
+
+  const handleSave = async (): Promise<void> => {
+    const rawLimit = elements.sessionLimitInput.value.trim();
+    const parsedLimit = Number(rawLimit);
+    if (!Number.isInteger(parsedLimit) || parsedLimit <= 0) {
+      elements.settingsStatus.textContent =
+        'Session limit must be a positive whole number.';
+      return;
+    }
+
+    const previousLimit = state.model.config.session_limit;
+    if (parsedLimit < previousLimit) {
+      let currentCount: number;
+      try {
+        const history = await loadHistory(fetchImpl);
+        currentCount = history.sessions?.length ?? 0;
+      } catch {
+        elements.settingsStatus.textContent = HISTORY_COUNT_ERROR_STATUS;
+        return;
+      }
+
+      if (currentCount > parsedLimit) {
+        const removed = currentCount - parsedLimit;
+        const message =
+          removed === 1
+            ? 'This will permanently delete 1 saved session. Continue?'
+            : `This will permanently delete ${removed} saved sessions. Continue?`;
+        if (!confirmAction(message)) {
+          return;
+        }
+      }
+    }
+
+    try {
+      const config = await saveConfig(
+        fetchImpl,
+        buildSavePayload(parsedLimit, elements.apiKeyInput.value),
+      );
+      state.hasLoadedConfig = true;
+      state.model = applyLoadedConfig(state.model, config);
+      elements.apiKeyInput.value = '';
+      closeModal();
+    } catch {
+      elements.settingsStatus.textContent = SAVE_ERROR_STATUS;
     }
   };
 
@@ -69,16 +179,27 @@ export function createSettingsFeature(ctx: AppContext): SettingsFeature {
     ctx.rerender();
   };
 
-  const attachHandlers = (): void => {
-    elements.openSettingsButton.addEventListener('click', () => {
-      state.isSettingsOpen = true;
-      ctx.rerender();
-    });
+  const confirmAction = (message: string): boolean => {
+    const win = (documentRef.defaultView ?? null) as
+      | (Window & { confirm?(message?: string): boolean })
+      | null;
+    if (win && typeof win.confirm === 'function') {
+      return win.confirm(message);
+    }
+    if (typeof confirm === 'function') {
+      return confirm(message);
+    }
+    return true;
+  };
 
-    elements.closeSettingsButton.addEventListener('click', () => {
-      state.isSettingsOpen = false;
-      ctx.rerender();
-    });
+  const attachHandlers = (): void => {
+    elements.openSettingsButton.addEventListener('click', openModal);
+
+    for (const button of elements.closeSettingsButtons) {
+      button.addEventListener('click', closeModal);
+    }
+    elements.settingsModalCloseButton.addEventListener('click', closeModal);
+    elements.settingsModalBackdrop.addEventListener('click', closeModal);
 
     for (const input of [
       elements.textLanguageInput,
@@ -105,6 +226,8 @@ export function createSettingsFeature(ctx: AppContext): SettingsFeature {
     elements.topicInput.addEventListener('input', refreshFromInputs);
 
     elements.clearApiKeyButton.addEventListener('click', handleClearApiKey);
+    elements.clearHistoryButton.addEventListener('click', handleClearHistory);
+    elements.saveSettingsButton.addEventListener('click', handleSave);
 
     elements.resetButton.addEventListener('click', handleReset);
 
@@ -125,7 +248,16 @@ export function createSettingsFeature(ctx: AppContext): SettingsFeature {
       elements.apiKeyPopover.classList.remove('is-open');
       elements.apiKeyPopoverToggle.setAttribute('aria-expanded', 'false');
     });
+
+    documentRef.addEventListener('keydown', (event) => {
+      if ((event as KeyboardEvent).key !== 'Escape') {
+        return;
+      }
+      if (state.isSettingsOpen) {
+        closeModal();
+      }
+    });
   };
 
-  return { attachHandlers };
+  return { attachHandlers, openModal, closeModal };
 }

@@ -101,3 +101,8 @@ export async function saveHistorySession(fetchImpl, session) {
         body: JSON.stringify(session),
     });
 }
+export async function clearHistory(fetchImpl) {
+    return await requestJson(fetchImpl, ENDPOINTS.history, {
+        method: 'DELETE',
+    });
+}
