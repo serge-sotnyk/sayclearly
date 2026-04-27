@@ -3,10 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:frontend": "tsc --project tsconfig.json",
+    "generate:types": "uv run python scripts/generate_openapi.py && openapi-typescript openapi.json -o src/sayclearly/static/api_types.ts",
+    "build:frontend": "npm run generate:types && tsc --project tsconfig.json",
     "test:frontend": "npm run build:frontend && node --test frontend-tests/*.test.js"
   },
   "devDependencies": {
+    "openapi-typescript": "^7.13.0",
     "typescript": "^5.9.3"
   }
 }

@@ -279,8 +279,8 @@ export function enterHistory(model, origin) {
 export function applyHistoryLoaded(model, history) {
     return {
         ...model,
-        history_sessions: history.sessions,
-        selected_history_session: history.sessions[0] ?? null,
+        history_sessions: history.sessions ?? [],
+        selected_history_session: history.sessions?.[0] ?? null,
         history_error: null,
     };
 }

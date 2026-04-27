@@ -570,8 +570,8 @@ function render(
   elements.reviewSummary.textContent = model.review?.summary ?? '';
   elements.reviewClarity.textContent = model.review?.clarity ?? '';
   elements.reviewPace.textContent = model.review?.pace ?? '';
-  elements.reviewHesitations.textContent = model.review?.hesitations.join('\n') ?? '';
-  elements.reviewRecommendations.textContent = model.review?.recommendations.join('\n') ?? '';
+  elements.reviewHesitations.textContent = model.review?.hesitations?.join('\n') ?? '';
+  elements.reviewRecommendations.textContent = model.review?.recommendations?.join('\n') ?? '';
 
   elements.historySaveError.hidden = model.history_save_error === null;
   elements.historySaveError.textContent = model.history_save_error ?? '';
@@ -587,7 +587,7 @@ function render(
 
     const summary = documentRef.createElement('p');
     summary.className = 'history-card-copy';
-    summary.textContent = session.analysis.summary[0] ?? 'No summary yet.';
+    summary.textContent = session.analysis.summary?.[0] ?? 'No summary yet.';
 
     const meta = documentRef.createElement('p');
     meta.className = 'history-card-copy';
@@ -631,13 +631,15 @@ function render(
   elements.historyList.replaceChildren(...cards);
 
   const selected = model.selected_history_session;
-  elements.historyDetailSummary.textContent = selected?.analysis.summary.join(' ') ?? 'Select a session to inspect its review details.';
+  elements.historyDetailSummary.textContent = selected?.analysis.summary?.join(' ') ?? 'Select a session to inspect its review details.';
   elements.historyDetailMeta.textContent = selected ? `${selected.language} • ${selected.topic_prompt ?? 'No topic'}` : '';
   elements.historyDetailText.textContent = selected?.text ?? '';
   elements.historyDetailClarity.textContent = selected ? `Clarity score: ${selected.analysis.clarity_score}` : '';
   elements.historyDetailPace.textContent = selected ? `Pace score: ${selected.analysis.pace_score}` : '';
   elements.historyDetailHesitations.textContent = selected
-    ? selected.analysis.hesitations.map((h) => `${h.note} (${h.start.toFixed(1)}s-${h.end.toFixed(1)}s)`).join('\n')
+    ? (selected.analysis.hesitations
+        ?.map((h) => `${h.note} (${h.start.toFixed(1)}s-${h.end.toFixed(1)}s)`)
+        .join('\n') ?? '')
     : '';
   elements.historyDetailReuseTopicButton.disabled = !selected?.topic_prompt;
   elements.historyRetryButton.hidden = model.history_error === null;

@@ -221,3 +221,6 @@ CLAUDE.local.md
 
 # Local git worktrees
 .worktrees/
+
+# Intermediate OpenAPI dump produced by `npm run generate:types`
+openapi.json

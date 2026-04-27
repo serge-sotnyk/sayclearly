@@ -7,3 +7,10 @@ repos:
         language: system
         files: ^(src/sayclearly/static/.*\.ts|tsconfig\.json|package\.json|package-lock\.json)$
         pass_filenames: false
+
+      - id: api-types-fresh
+        name: Verify generated TypeScript API types match Pydantic schemas
+        entry: uv run python scripts/check_api_types.py
+        language: system
+        files: ^src/sayclearly/(.*/api\.py|.*/models\.py|app\.py)$
+        pass_filenames: false

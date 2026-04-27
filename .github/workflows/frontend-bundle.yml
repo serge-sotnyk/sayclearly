@@ -1,19 +1,21 @@
-name: Frontend bundle freshness
+name: Frontend bundle and API types freshness
 
 on:
   pull_request:
     paths:
-      - 'src/sayclearly/static/**'
+      - 'src/sayclearly/**'
       - 'tsconfig.json'
       - 'package.json'
       - 'package-lock.json'
+      - 'pyproject.toml'
   push:
     branches: [main]
     paths:
-      - 'src/sayclearly/static/**'
+      - 'src/sayclearly/**'
       - 'tsconfig.json'
       - 'package.json'
       - 'package-lock.json'
+      - 'pyproject.toml'
 
 jobs:
   bundle-fresh:
@@ -26,9 +28,22 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
       - run: npm ci
 
       - run: npm run build:frontend
+
+      - name: Verify generated API types are up to date
+        run: |
+          if ! git diff --exit-code -- src/sayclearly/static/api_types.ts; then
+            echo "::error::Generated TypeScript API types are stale. Run 'npm run generate:types' locally and commit src/sayclearly/static/api_types.ts."
+            exit 1
+          fi
 
       - name: Verify bundle is up to date
         run: |

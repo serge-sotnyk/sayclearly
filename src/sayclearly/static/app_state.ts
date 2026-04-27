@@ -1,3 +1,7 @@
+import type { components } from './api_types.js';
+
+type Schemas = components['schemas'];
+
 export type FlowState =
   | 'home'
   | 'generating_text'
@@ -12,8 +16,7 @@ export type FlowState =
   | 'history'
   | 'error';
 
-type ConfigSource = 'env' | 'stored' | 'none';
-type ThinkingLevel = 'low' | 'medium' | 'high';
+type ThinkingLevel = Schemas['GeminiPublicConfig']['text_thinking_level'];
 
 export const LANGUAGES: readonly string[] = [
   'English',
@@ -61,43 +64,9 @@ const FALLBACK_GEMINI_MODELS: GeminiModelCatalogEntry[] = [
   },
 ];
 
-interface GeminiModelCatalogEntry {
-  id: string;
-  label: string;
-  free_tier_requests_per_day_hint: number | null;
-}
+type GeminiModelCatalogEntry = Schemas['GeminiModelCatalogEntry'];
 
-interface GeminiPublicConfig {
-  model: string;
-  text_model: string;
-  analysis_model: string;
-  same_model_for_analysis: boolean;
-  text_thinking_level: ThinkingLevel;
-  has_api_key: boolean;
-  api_key_source: ConfigSource;
-  available_models: GeminiModelCatalogEntry[];
-}
-
-interface LangfusePublicConfig {
-  host: string | null;
-  enabled: boolean;
-  has_public_key: boolean;
-  has_secret_key: boolean;
-  public_key_source: ConfigSource;
-  secret_key_source: ConfigSource;
-}
-
-export interface PublicConfig {
-  version: number;
-  text_language: string;
-  analysis_language: string;
-  same_language_for_analysis: boolean;
-  ui_language: string;
-  session_limit: number;
-  keep_last_audio: boolean;
-  gemini: GeminiPublicConfig;
-  langfuse: LangfusePublicConfig;
-}
+export type PublicConfig = Schemas['PublicConfigView'];
 
 export interface SettingsFormState {
   text_language: string;
@@ -121,82 +90,19 @@ export interface InitialPageData {
   initial_topic: string | null;
 }
 
-export interface GeneratedExercise {
-  language: string;
-  analysis_language: string;
-  topic_prompt: string;
-  text: string;
-}
-
-export interface RecordingReview {
-  summary: string;
-  clarity: string;
-  pace: string;
-  hesitations: string[];
-  recommendations: string[];
-}
-
-export interface Hesitation {
-  start: number;
-  end: number;
-  note: string;
-}
-
-export interface SessionAnalysis {
-  clarity_score: number;
-  pace_score: number;
-  hesitations: Hesitation[];
-  summary: string[];
-}
-
-export interface HistorySession {
-  id: string;
-  created_at: string;
-  language: string;
-  analysis_language: string | null;
-  topic_prompt: string | null;
-  text: string;
-  analysis: SessionAnalysis;
-}
-
-export interface HistoryStore {
-  version: number;
-  sessions: HistorySession[];
-}
-
-export interface RecordingAnalysisResult {
-  review: RecordingReview;
-  analysis: SessionAnalysis;
-}
+export type GeneratedExercise = Schemas['ExerciseGenerationResponse'];
+export type RecordingReview = Schemas['RecordingReview'];
+export type Hesitation = Schemas['Hesitation'];
+export type SessionAnalysis = Schemas['SessionAnalysis'];
+export type HistorySession = Schemas['HistorySession'];
+export type HistoryStore = Schemas['HistoryStore'];
+export type RecordingAnalysisResult = Schemas['RecordingAnalysisResult'];
 
 type HistoryOrigin = 'review' | 'home' | null;
 
-export interface GenerateRequest {
-  language: string;
-  analysis_language: string;
-  topic_prompt: string;
-}
+export type GenerateRequest = Schemas['ExerciseGenerationRequest'];
 
-export interface ConfigUpdatePayload {
-  text_language: string;
-  analysis_language: string;
-  same_language_for_analysis: boolean;
-  ui_language: string;
-  session_limit: number;
-  keep_last_audio: boolean;
-  gemini: {
-    text_model: string;
-    analysis_model: string;
-    same_model_for_analysis: boolean;
-    text_thinking_level: ThinkingLevel;
-    api_key: string | null;
-  };
-  langfuse: {
-    host: string | null;
-    public_key: string | null;
-    secret_key: string | null;
-  };
-}
+export type ConfigUpdatePayload = Schemas['ConfigUpdatePayload'];
 
 export interface AppModel {
   flow: FlowState;
@@ -485,8 +391,8 @@ export function enterHistory(model: AppModel, origin: HistoryOrigin): AppModel {
 export function applyHistoryLoaded(model: AppModel, history: HistoryStore): AppModel {
   return {
     ...model,
-    history_sessions: history.sessions,
-    selected_history_session: history.sessions[0] ?? null,
+    history_sessions: history.sessions ?? [],
+    selected_history_session: history.sessions?.[0] ?? null,
     history_error: null,
   };
 }
