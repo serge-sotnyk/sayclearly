@@ -80,9 +80,12 @@ class SessionAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     clarity_score: int = Field(ge=0, le=100)
+    clarity_comment: str = ""
     pace_score: int = Field(ge=0, le=100)
+    pace_comment: str = ""
     hesitations: list[Hesitation] = Field(default_factory=list)
     summary: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
 
 
 class HistorySession(BaseModel):

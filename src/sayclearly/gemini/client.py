@@ -6,6 +6,9 @@ from sayclearly.gemini.catalog import ThinkingLevel
 from sayclearly.gemini.telemetry import GeminiTelemetry
 from sayclearly.recording.models import StructuredAudioAnalysis
 
+_AUDIO_ANALYSIS_TEMPERATURE = 0.3
+_TEXT_GENERATION_TEMPERATURE = 1.0
+
 _THINKING_BUDGETS: dict[ThinkingLevel, int] = {
     "low": 128,
     "medium": 512,
@@ -81,6 +84,7 @@ class GeminiClient:
             prompt=prompt,
             model=model,
             thinking_level=thinking_level,
+            temperature=_TEXT_GENERATION_TEMPERATURE,
         )
 
         try:
@@ -88,7 +92,7 @@ class GeminiClient:
                 model=model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=1,
+                    temperature=_TEXT_GENERATION_TEMPERATURE,
                     response_mime_type="application/json",
                     response_json_schema=GeneratedExercise.model_json_schema(),
                     thinking_config=self._build_thinking_config(
@@ -128,11 +132,18 @@ class GeminiClient:
         model: str,
         thinking_level: ThinkingLevel,
         system_instruction: str | None = None,
+        language: str | None = None,
+        analysis_language: str | None = None,
     ) -> StructuredAudioAnalysis:
         trace = self._telemetry.start_audio_analysis(
             prompt=prompt,
             model=model,
             thinking_level=thinking_level,
+            temperature=_AUDIO_ANALYSIS_TEMPERATURE,
+            audio_size_bytes=len(audio_bytes),
+            content_type=content_type,
+            language=language,
+            analysis_language=analysis_language,
         )
 
         try:
@@ -144,7 +155,7 @@ class GeminiClient:
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    temperature=1,
+                    temperature=_AUDIO_ANALYSIS_TEMPERATURE,
                     response_mime_type="application/json",
                     response_json_schema=StructuredAudioAnalysis.model_json_schema(),
                     thinking_config=self._build_thinking_config(

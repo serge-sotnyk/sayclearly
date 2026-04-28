@@ -78,6 +78,7 @@ def test_start_text_generation_records_success_with_langfuse_when_enabled(
             "input": "Generate a short exercise.",
             "model": "gemini-2.5-flash",
             "model_parameters": {"thinking_level": "high"},
+            "metadata": {"model": "gemini-2.5-flash", "thinking_level": "high"},
         }
     ]
     assert fake_langfuse.observation.updates == [{"output": "Speak slowly."}]

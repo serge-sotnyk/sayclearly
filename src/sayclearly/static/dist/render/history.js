@@ -1,3 +1,11 @@
+import { formatHesitations } from './hesitations.js';
+function formatScoreLine(label, score, comment) {
+    const trimmed = comment?.trim();
+    if (trimmed) {
+        return `${label} ${score}: ${trimmed}`;
+    }
+    return `${label} score: ${score}`;
+}
 export function renderHistory(documentRef, elements, model, callbacks) {
     elements.historySaveError.hidden = model.history_save_error === null;
     elements.historySaveError.textContent = model.history_save_error ?? '';
@@ -50,15 +58,16 @@ export function renderHistory(documentRef, elements, model, callbacks) {
         : '';
     elements.historyDetailText.textContent = selected?.text ?? '';
     elements.historyDetailClarity.textContent = selected
-        ? `Clarity score: ${selected.analysis.clarity_score}`
+        ? formatScoreLine('Clarity', selected.analysis.clarity_score, selected.analysis.clarity_comment)
         : '';
     elements.historyDetailPace.textContent = selected
-        ? `Pace score: ${selected.analysis.pace_score}`
+        ? formatScoreLine('Pace', selected.analysis.pace_score, selected.analysis.pace_comment)
         : '';
     elements.historyDetailHesitations.textContent = selected
-        ? (selected.analysis.hesitations
-            ?.map((h) => `${h.note} (${h.start.toFixed(1)}s-${h.end.toFixed(1)}s)`)
-            .join('\n') ?? '')
+        ? formatHesitations(selected.analysis.hesitations)
+        : '';
+    elements.historyDetailRecommendations.textContent = selected
+        ? (selected.analysis.recommendations?.join('\n') ?? '')
         : '';
     elements.historyDetailReuseTopicButton.disabled = !selected?.topic_prompt;
     elements.historyRetryButton.hidden = model.history_error === null;

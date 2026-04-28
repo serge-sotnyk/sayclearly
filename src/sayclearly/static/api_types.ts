@@ -344,7 +344,7 @@ export interface components {
             /** Clarity */
             clarity: string;
             /** Hesitations */
-            hesitations?: string[];
+            hesitations?: components["schemas"]["Hesitation"][];
             /** Pace */
             pace: string;
             /** Recommendations */
@@ -354,12 +354,24 @@ export interface components {
         };
         /** SessionAnalysis */
         SessionAnalysis: {
+            /**
+             * Clarity Comment
+             * @default
+             */
+            clarity_comment: string;
             /** Clarity Score */
             clarity_score: number;
             /** Hesitations */
             hesitations?: components["schemas"]["Hesitation"][];
+            /**
+             * Pace Comment
+             * @default
+             */
+            pace_comment: string;
             /** Pace Score */
             pace_score: number;
+            /** Recommendations */
+            recommendations?: string[];
             /** Summary */
             summary?: string[];
         };

@@ -2,8 +2,6 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
-from pydantic import ValidationError
-
 from sayclearly.config.service import resolve_gemini_api_key
 from sayclearly.gemini.catalog import sanitize_analysis_model
 from sayclearly.gemini.client import (
@@ -30,7 +28,7 @@ from sayclearly.storage.files import (
     ensure_storage_root,
     load_config,
 )
-from sayclearly.storage.models import Hesitation, SessionAnalysis
+from sayclearly.storage.models import SessionAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +102,11 @@ class RecordingService:
                 ),
                 model=sanitize_analysis_model(config.gemini.analysis_model),
                 thinking_level=config.gemini.text_thinking_level,
-                system_instruction=build_audio_analysis_system_instruction(),
+                system_instruction=build_audio_analysis_system_instruction(
+                    analysis_language=metadata.analysis_language,
+                ),
+                language=metadata.language,
+                analysis_language=metadata.analysis_language,
             )
         except MissingGeminiApiKeyError as exc:
             raise RecordingServiceConfigurationError(
@@ -141,35 +143,20 @@ class RecordingService:
         return GeminiClient(api_key=api_key, telemetry=self._telemetry)
 
     def _normalize_analysis(self, structured: StructuredAudioAnalysis) -> RecordingAnalysisResult:
-        analysis_hesitations = []
-        for hesitation in structured.hesitations:
-            try:
-                analysis_hesitations.append(Hesitation.model_validate(hesitation))
-            except ValidationError:
-                continue
         analysis = SessionAnalysis(
             clarity_score=structured.clarity_score,
+            clarity_comment=structured.clarity_comment,
             pace_score=structured.pace_score,
-            hesitations=analysis_hesitations,
+            pace_comment=structured.pace_comment,
+            hesitations=structured.hesitations,
             summary=structured.summary,
+            recommendations=structured.recommendations,
         )
         review = RecordingReview(
-            summary=" ".join(structured.summary) if structured.summary else "Analysis complete.",
-            clarity=self._score_to_text(structured.clarity_score, "clarity"),
-            pace=self._score_to_text(structured.pace_score, "pace"),
-            hesitations=[
-                f"{hesitation.note} (at {hesitation.start:.1f}s-{hesitation.end:.1f}s)"
-                for hesitation in analysis_hesitations
-            ],
+            summary=" ".join(structured.summary) if structured.summary else "",
+            clarity=structured.clarity_comment,
+            pace=structured.pace_comment,
+            hesitations=structured.hesitations,
             recommendations=structured.recommendations,
         )
         return RecordingAnalysisResult(review=review, analysis=analysis)
-
-    def _score_to_text(self, score: int, dimension: str) -> str:
-        if score >= 80:
-            return f"The {dimension} is very good."
-        if score >= 60:
-            return f"The {dimension} is decent, with room for improvement."
-        if score >= 40:
-            return f"The {dimension} needs some attention."
-        return f"The {dimension} needs significant work."

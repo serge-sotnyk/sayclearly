@@ -72,7 +72,13 @@ const review = {
   summary: 'Strong retelling with a few rushed phrases.',
   clarity: 'Mostly clear consonants with occasional dropped endings.',
   pace: 'A little too fast in the middle section.',
-  hesitations: ['Paused before the last sentence'],
+  hesitations: [
+    {
+      start: 9.3,
+      end: 10.1,
+      note: 'Paused before the last sentence',
+    },
+  ],
   recommendations: ['Slow down after the first sentence', 'Finish final consonants more clearly'],
 };
 

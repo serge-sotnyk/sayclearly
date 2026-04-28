@@ -318,6 +318,7 @@ function createShell({ recentTopics = null } = {}) {
     ['[data-history-detail-clarity]', new FakeElement()],
     ['[data-history-detail-pace]', new FakeElement()],
     ['[data-history-detail-hesitations]', new FakeElement()],
+    ['[data-history-detail-recommendations]', new FakeElement()],
     ['[data-history-detail-reuse-topic-button]', new FakeElement({ disabled: true })],
     ['[data-settings-status]', new FakeElement()],
     ['[data-clear-api-key-button]', new FakeElement()],
@@ -459,7 +460,7 @@ test('startApp loads config, renders the shell, and keeps languages synced while
   assert.equal(shell.elements.get('[data-settings-modal]').hidden, true);
   assert.deepEqual(
     shell.elements.get('[data-text-model-select]').children.map((option) => option.textContent),
-    ['Gemini 3 Flash', 'Gemini 2.5 Flash (250 RPD hint)'],
+    ['Gemini 3 Flash', 'Gemini 2.5 Flash (250 RPD)'],
   );
 
   await shell.elements.get('[data-open-settings-button]').click();
@@ -815,7 +816,7 @@ test('startApp keeps manual model choices available when config loading fails', 
   assert.equal(shell.elements.get('[data-analysis-model-select]').value, 'gemini-3-flash-preview');
   assert.deepEqual(
     shell.elements.get('[data-text-model-select]').children.map((option) => option.textContent),
-    ['Gemini 3 Flash', 'Gemini 3.1 Flash-Lite Preview', 'Gemini 2.5 Flash (250 RPD hint)', 'Gemini 2.5 Flash-Lite (1000 RPD hint)'],
+    ['Gemini 3 Flash', 'Gemini 3.1 Flash-Lite Preview', 'Gemini 2.5 Flash (250 RPD)', 'Gemini 2.5 Flash-Lite (1000 RPD)'],
   );
 });
 
@@ -929,7 +930,13 @@ test('startApp records, uploads, renders review, and clears review on record aga
     summary: 'Clear retelling with a few rushed transitions.',
     clarity: 'Mostly clear.',
     pace: 'Slightly fast near the end.',
-    hesitations: ['A short pause before the final sentence.'],
+    hesitations: [
+      {
+        start: 12.4,
+        end: 13.1,
+        note: 'A short pause before the final sentence.',
+      },
+    ],
     recommendations: ['Slow down the ending.', 'Keep sentence openings steady.'],
   };
   const analysisResult = {

@@ -75,12 +75,14 @@ class GeminiTelemetry:
         prompt: str,
         model: str,
         thinking_level: ThinkingLevel,
+        temperature: float | None = None,
     ) -> GeminiGenerationTrace:
         return self._start_generation(
             name="gemini.generate_exercise",
-            prompt=prompt,
+            input_payload=prompt,
             model=model,
             thinking_level=thinking_level,
+            temperature=temperature,
         )
 
     def start_audio_analysis(
@@ -89,33 +91,55 @@ class GeminiTelemetry:
         prompt: str,
         model: str,
         thinking_level: ThinkingLevel,
+        temperature: float | None = None,
+        audio_size_bytes: int | None = None,
+        content_type: str | None = None,
+        language: str | None = None,
+        analysis_language: str | None = None,
     ) -> GeminiGenerationTrace:
+        input_payload: dict[str, Any] = {"prompt": prompt}
+        if audio_size_bytes is not None:
+            input_payload["audio_size_bytes"] = audio_size_bytes
+        if content_type is not None:
+            input_payload["content_type"] = content_type
+        if language is not None:
+            input_payload["language"] = language
+        if analysis_language is not None:
+            input_payload["analysis_language"] = analysis_language
+
         return self._start_generation(
             name="gemini.analyze_audio",
-            prompt=prompt,
+            input_payload=input_payload,
             model=model,
             thinking_level=thinking_level,
+            temperature=temperature,
         )
 
     def _start_generation(
         self,
         *,
         name: str,
-        prompt: str,
+        input_payload: object,
         model: str,
         thinking_level: ThinkingLevel,
+        temperature: float | None,
     ) -> GeminiGenerationTrace:
         langfuse_client = self._get_langfuse_client()
         if langfuse_client is None:
             return GeminiGenerationTrace()
 
+        model_parameters: dict[str, Any] = {"thinking_level": thinking_level}
+        if temperature is not None:
+            model_parameters["temperature"] = temperature
+
         try:
             observation = langfuse_client.start_observation(
                 name=name,
                 as_type="generation",
-                input=prompt,
+                input=input_payload,
                 model=model,
-                model_parameters={"thinking_level": thinking_level},
+                model_parameters=model_parameters,
+                metadata={"model": model, **model_parameters},
             )
         except Exception:
             logger.debug("Langfuse start_observation failed", exc_info=True)

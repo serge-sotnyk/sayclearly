@@ -85,6 +85,7 @@ export interface ShellElements {
   historyDetailClarity: HTMLElement;
   historyDetailPace: HTMLElement;
   historyDetailHesitations: HTMLElement;
+  historyDetailRecommendations: HTMLElement;
   historyDetailReuseTopicButton: HTMLButtonElement;
   localStorageNote: HTMLElement;
   telemetryNote: HTMLElement;
@@ -182,6 +183,10 @@ export function collectShellElements(root: RootLike): ShellElements {
     historyDetailClarity: getRequiredElement(root, '[data-history-detail-clarity]'),
     historyDetailPace: getRequiredElement(root, '[data-history-detail-pace]'),
     historyDetailHesitations: getRequiredElement(root, '[data-history-detail-hesitations]'),
+    historyDetailRecommendations: getRequiredElement(
+      root,
+      '[data-history-detail-recommendations]',
+    ),
     historyDetailReuseTopicButton: getRequiredElement(
       root,
       '[data-history-detail-reuse-topic-button]',

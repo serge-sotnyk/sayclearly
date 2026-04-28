@@ -65,19 +65,12 @@ def test_stage_4_happy_path_runs_config_generation_and_recording_analysis(
 
     assert generate_response.status_code == 200
 
-    def fake_analyze_audio(
-        self,
-        *,
-        audio_bytes,
-        content_type,
-        prompt,
-        model,
-        thinking_level,
-        system_instruction=None,
-    ):
+    def fake_analyze_audio(self, **kwargs):
         return StructuredAudioAnalysis(
             clarity_score=72,
+            clarity_comment="Clear consonants throughout.",
             pace_score=65,
+            pace_comment="Steady, with a brief slowdown mid-way.",
             hesitations=[{"start": 1.0, "end": 2.0, "note": "pause"}],
             summary=["Good effort."],
             recommendations=["Keep practicing."],

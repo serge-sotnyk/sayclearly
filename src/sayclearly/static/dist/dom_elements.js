@@ -88,6 +88,7 @@ export function collectShellElements(root) {
         historyDetailClarity: getRequiredElement(root, '[data-history-detail-clarity]'),
         historyDetailPace: getRequiredElement(root, '[data-history-detail-pace]'),
         historyDetailHesitations: getRequiredElement(root, '[data-history-detail-hesitations]'),
+        historyDetailRecommendations: getRequiredElement(root, '[data-history-detail-recommendations]'),
         historyDetailReuseTopicButton: getRequiredElement(root, '[data-history-detail-reuse-topic-button]'),
         localStorageNote: getRequiredElement(root, '[data-local-storage-note]'),
         telemetryNote: getRequiredElement(root, '[data-telemetry-note]'),
