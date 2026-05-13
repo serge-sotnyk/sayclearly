@@ -27,8 +27,8 @@ const FALLBACK_GEMINI_MODELS = [
         free_tier_requests_per_day_hint: null,
     },
     {
-        id: 'gemini-3.1-flash-lite-preview',
-        label: 'Gemini 3.1 Flash-Lite Preview',
+        id: 'gemini-3.1-flash-lite',
+        label: 'Gemini 3.1 Flash-Lite',
         free_tier_requests_per_day_hint: null,
     },
     {

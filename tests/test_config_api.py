@@ -16,7 +16,7 @@ def make_payload() -> dict[str, object]:
         "keep_last_audio": False,
         "gemini": {
             "text_model": "gemini-3-flash-preview",
-            "analysis_model": "gemini-3.1-flash-lite-preview",
+            "analysis_model": "gemini-3.1-flash-lite",
             "same_model_for_analysis": False,
             "text_thinking_level": "medium",
             "api_key": "stored-gemini",
@@ -60,7 +60,7 @@ def test_post_config_persists_changes_across_app_recreation(tmp_path: Path) -> N
     assert get_response.json()["gemini"]["has_api_key"] is True
     assert get_response.json()["gemini"]["api_key_source"] == "stored"
     assert get_response.json()["gemini"]["text_model"] == "gemini-3-flash-preview"
-    assert get_response.json()["gemini"]["analysis_model"] == "gemini-3.1-flash-lite-preview"
+    assert get_response.json()["gemini"]["analysis_model"] == "gemini-3.1-flash-lite"
 
 
 def test_delete_api_key_clears_only_the_stored_value(tmp_path: Path, monkeypatch) -> None:
@@ -121,14 +121,14 @@ def test_post_config_accepts_legacy_gemini_model_payload(tmp_path: Path) -> None
     client = TestClient(create_app(tmp_path))
     payload = make_payload()
     payload["gemini"] = {
-        "model": "gemini-3.1-flash-lite-preview",
+        "model": "gemini-3.1-flash-lite",
         "api_key": None,
     }
 
     response = client.post("/api/config", json=payload)
 
     assert response.status_code == 200
-    assert response.json()["gemini"]["model"] == "gemini-3.1-flash-lite-preview"
-    assert response.json()["gemini"]["text_model"] == "gemini-3.1-flash-lite-preview"
-    assert response.json()["gemini"]["analysis_model"] == "gemini-3.1-flash-lite-preview"
+    assert response.json()["gemini"]["model"] == "gemini-3.1-flash-lite"
+    assert response.json()["gemini"]["text_model"] == "gemini-3.1-flash-lite"
+    assert response.json()["gemini"]["analysis_model"] == "gemini-3.1-flash-lite"
     assert response.json()["gemini"]["same_model_for_analysis"] is True

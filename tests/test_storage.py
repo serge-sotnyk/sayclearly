@@ -45,7 +45,7 @@ def test_load_config_creates_default_storage_tree(tmp_path: Path, monkeypatch) -
 def test_load_config_keeps_product_defaults_in_storage_when_env_defaults_are_set(
     tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite-preview")
+    monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite")
 
     config = load_config(tmp_path)
 

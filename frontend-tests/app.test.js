@@ -174,7 +174,7 @@ function createConfig(overrides = {}) {
     gemini: {
       model: 'gemini-3-flash-preview',
       text_model: 'gemini-3-flash-preview',
-      analysis_model: 'gemini-3.1-flash-lite-preview',
+      analysis_model: 'gemini-3.1-flash-lite',
       same_model_for_analysis: false,
       text_thinking_level: 'medium',
       has_api_key: true,
@@ -451,7 +451,7 @@ test('startApp loads config, renders the shell, and keeps languages synced while
   assert.equal(shell.elements.get('[data-text-model-select]').value, 'gemini-3-flash-preview');
   assert.equal(
     shell.elements.get('[data-analysis-model-select]').value,
-    'gemini-3.1-flash-lite-preview',
+    'gemini-3.1-flash-lite',
   );
   assert.equal(shell.elements.get('[data-same-model-toggle]').checked, false);
   assert.equal(shell.elements.get('[data-thinking-level-select]').value, 'medium');
@@ -520,7 +520,7 @@ test('startApp disables the analysis model selector and saves a coherent gemini 
 
   shell.elements.get('[data-text-model-select]').value = 'gemini-2.5-flash';
   await shell.elements.get('[data-text-model-select]').change();
-  shell.elements.get('[data-analysis-model-select]').value = 'gemini-3.1-flash-lite-preview';
+  shell.elements.get('[data-analysis-model-select]').value = 'gemini-3.1-flash-lite';
   await shell.elements.get('[data-analysis-model-select]').change();
   shell.elements.get('[data-same-model-toggle]').checked = true;
   await shell.elements.get('[data-same-model-toggle]').change();
@@ -568,7 +568,7 @@ test('startApp saves config, generates text, advances steps, and resets home', a
     keep_last_audio: false,
     gemini: {
       text_model: 'gemini-3-flash-preview',
-      analysis_model: 'gemini-3.1-flash-lite-preview',
+      analysis_model: 'gemini-3.1-flash-lite',
       same_model_for_analysis: false,
       text_thinking_level: 'medium',
       api_key: null,
@@ -632,7 +632,7 @@ test('startApp clears stored API keys and refreshes the rendered status', async 
     gemini: {
       model: 'gemini-3-flash-preview',
       text_model: 'gemini-3-flash-preview',
-      analysis_model: 'gemini-3.1-flash-lite-preview',
+      analysis_model: 'gemini-3.1-flash-lite',
       same_model_for_analysis: false,
       text_thinking_level: 'medium',
       has_api_key: false,
@@ -816,7 +816,7 @@ test('startApp keeps manual model choices available when config loading fails', 
   assert.equal(shell.elements.get('[data-analysis-model-select]').value, 'gemini-3-flash-preview');
   assert.deepEqual(
     shell.elements.get('[data-text-model-select]').children.map((option) => option.textContent),
-    ['Gemini 3 Flash', 'Gemini 3.1 Flash-Lite Preview', 'Gemini 2.5 Flash (250 RPD)', 'Gemini 2.5 Flash-Lite (1000 RPD)'],
+    ['Gemini 3 Flash', 'Gemini 3.1 Flash-Lite', 'Gemini 2.5 Flash (250 RPD)', 'Gemini 2.5 Flash-Lite (1000 RPD)'],
   );
 });
 

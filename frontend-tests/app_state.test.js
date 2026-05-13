@@ -35,7 +35,7 @@ const publicConfig = {
   gemini: {
     model: 'gemini-3-flash-preview',
     text_model: 'gemini-3-flash-preview',
-    analysis_model: 'gemini-3.1-flash-lite-preview',
+    analysis_model: 'gemini-3.1-flash-lite',
     same_model_for_analysis: false,
     text_thinking_level: 'medium',
     has_api_key: true,
@@ -126,7 +126,7 @@ test('syncAnalysisLanguage copies text language when toggle is enabled', () => {
     analysis_language: 'uk',
     same_language_for_analysis: true,
     text_model: 'gemini-3-flash-preview',
-    analysis_model: 'gemini-3.1-flash-lite-preview',
+    analysis_model: 'gemini-3.1-flash-lite',
     same_model_for_analysis: false,
     text_thinking_level: 'medium',
     topic_prompt: 'A short weather forecast',
@@ -192,7 +192,7 @@ test('buildGenerateRequest and buildConfigUpdatePayload preserve current config 
     analysis_language: 'pl',
     same_language_for_analysis: true,
     text_model: 'gemini-3-flash-preview',
-    analysis_model: 'gemini-3.1-flash-lite-preview',
+    analysis_model: 'gemini-3.1-flash-lite',
     same_model_for_analysis: false,
     text_thinking_level: 'medium',
     topic_prompt: 'Describe a quiet library',
@@ -213,7 +213,7 @@ test('buildGenerateRequest and buildConfigUpdatePayload preserve current config 
     keep_last_audio: true,
     gemini: {
       text_model: 'gemini-3-flash-preview',
-      analysis_model: 'gemini-3.1-flash-lite-preview',
+      analysis_model: 'gemini-3.1-flash-lite',
       same_model_for_analysis: false,
       text_thinking_level: 'medium',
       api_key: null,
@@ -232,7 +232,7 @@ test('buildConfigUpdatePayload keeps analysis model aligned when same model is e
     analysis_language: 'en',
     same_language_for_analysis: false,
     text_model: 'gemini-2.5-flash',
-    analysis_model: 'gemini-3.1-flash-lite-preview',
+    analysis_model: 'gemini-3.1-flash-lite',
     same_model_for_analysis: true,
     text_thinking_level: 'medium',
     topic_prompt: 'Describe a market square',
@@ -243,7 +243,7 @@ test('buildConfigUpdatePayload keeps analysis model aligned when same model is e
     gemini: {
       ...publicConfig.gemini,
       text_model: 'gemini-2.5-flash',
-      analysis_model: 'gemini-3.1-flash-lite-preview',
+      analysis_model: 'gemini-3.1-flash-lite',
       same_model_for_analysis: true,
     },
   };

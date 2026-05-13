@@ -19,7 +19,7 @@ def make_payload(**overrides: object) -> ConfigUpdatePayload:
         "keep_last_audio": True,
         "gemini": {
             "text_model": "gemini-3-flash-preview",
-            "analysis_model": "gemini-3.1-flash-lite-preview",
+            "analysis_model": "gemini-3.1-flash-lite",
             "same_model_for_analysis": False,
             "text_thinking_level": "medium",
             "api_key": "stored-gemini",
@@ -157,13 +157,13 @@ def test_update_payload_rejects_empty_provider_values(field: str, value: object)
 def test_update_payload_accepts_legacy_gemini_model_field() -> None:
     payload = make_payload(
         gemini={
-            "model": "gemini-3.1-flash-lite-preview",
+            "model": "gemini-3.1-flash-lite",
             "api_key": None,
         }
     )
 
-    assert payload.gemini.text_model == "gemini-3.1-flash-lite-preview"
-    assert payload.gemini.analysis_model == "gemini-3.1-flash-lite-preview"
+    assert payload.gemini.text_model == "gemini-3.1-flash-lite"
+    assert payload.gemini.analysis_model == "gemini-3.1-flash-lite"
     assert payload.gemini.same_model_for_analysis is True
 
 
@@ -177,7 +177,7 @@ def test_update_payload_accepts_legacy_gemini_model_field() -> None:
 def test_update_payload_rejects_unsupported_gemini_models(field: str, value: str) -> None:
     payload = {
         "text_model": "gemini-3-flash-preview",
-        "analysis_model": "gemini-3.1-flash-lite-preview",
+        "analysis_model": "gemini-3.1-flash-lite",
         "same_model_for_analysis": False,
         "text_thinking_level": "medium",
         "api_key": "stored-gemini",
@@ -201,7 +201,7 @@ def test_get_public_config_hides_secrets_and_reports_effective_sources(
 
     assert public.text_language == "en"
     assert public.gemini.text_model == "gemini-3-flash-preview"
-    assert public.gemini.analysis_model == "gemini-3.1-flash-lite-preview"
+    assert public.gemini.analysis_model == "gemini-3.1-flash-lite"
     assert public.gemini.same_model_for_analysis is False
     assert public.gemini.text_thinking_level == "medium"
     assert public.gemini.has_api_key is True
@@ -216,7 +216,7 @@ def test_get_public_config_hides_secrets_and_reports_effective_sources(
     assert public.model_dump()["gemini"] == {
         "model": "gemini-3-flash-preview",
         "text_model": "gemini-3-flash-preview",
-        "analysis_model": "gemini-3.1-flash-lite-preview",
+        "analysis_model": "gemini-3.1-flash-lite",
         "same_model_for_analysis": False,
         "text_thinking_level": "medium",
         "has_api_key": True,
@@ -260,22 +260,22 @@ def test_get_public_config_enables_langfuse_when_base_url_env_is_used(
 
 
 def test_get_public_config_uses_env_defaults_when_storage_is_missing(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite-preview")
+    monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3.1-flash-lite")
 
     public = ConfigService(tmp_path).get_public_config()
 
-    assert public.gemini.text_model == "gemini-3.1-flash-lite-preview"
-    assert public.gemini.analysis_model == "gemini-3.1-flash-lite-preview"
+    assert public.gemini.text_model == "gemini-3.1-flash-lite"
+    assert public.gemini.analysis_model == "gemini-3.1-flash-lite"
 
 
 def test_get_public_config_uses_explicit_analysis_env_default(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("SAYCLEARLY_DEFAULT_TEXT_MODEL", "gemini-3-flash-preview")
-    monkeypatch.setenv("SAYCLEARLY_DEFAULT_ANALYSIS_MODEL", "gemini-3.1-flash-lite-preview")
+    monkeypatch.setenv("SAYCLEARLY_DEFAULT_ANALYSIS_MODEL", "gemini-3.1-flash-lite")
 
     public = ConfigService(tmp_path).get_public_config()
 
     assert public.gemini.text_model == "gemini-3-flash-preview"
-    assert public.gemini.analysis_model == "gemini-3.1-flash-lite-preview"
+    assert public.gemini.analysis_model == "gemini-3.1-flash-lite"
 
 
 def test_get_public_config_sanitizes_unsupported_stored_gemini_models(tmp_path: Path) -> None:
@@ -302,7 +302,7 @@ def test_update_config_persists_public_and_secret_values_in_separate_files(tmp_p
     assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["session_limit"] == 123
     assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["gemini"] == {
         "text_model": "gemini-3-flash-preview",
-        "analysis_model": "gemini-3.1-flash-lite-preview",
+        "analysis_model": "gemini-3.1-flash-lite",
         "same_model_for_analysis": False,
         "text_thinking_level": "medium",
     }
@@ -367,7 +367,7 @@ def test_update_config_rolls_back_public_config_when_secret_write_fails(
             make_payload(
                 text_language="de",
                 gemini={
-                    "text_model": "gemini-3.1-flash-lite-preview",
+                    "text_model": "gemini-3.1-flash-lite",
                     "analysis_model": "gemini-3-flash-preview",
                     "same_model_for_analysis": False,
                     "text_thinking_level": "high",
